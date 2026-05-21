@@ -1,63 +1,122 @@
-import { useState } from 'react';
-import { ArtifactExplorer } from '../components/artifacts/ArtifactExplorer';
-import { CodeViewer } from '../components/artifacts/CodeViewer';
-import { AIInsights } from '../components/artifacts/AIInsights';
-import { ArtifactTimeline } from '../components/artifacts/ArtifactTimeline';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from "react";
+import { ArtifactExplorer } from "../components/artifacts/ArtifactExplorer";
+import { CodeViewer } from "../components/artifacts/CodeViewer";
+import { AIInsights } from "../components/artifacts/AIInsights";
+import { ArtifactTimeline } from "../components/artifacts/ArtifactTimeline";
+import { Sparkles, GitCommit } from "lucide-react";
+
+interface ChangeRequest {
+  description: string;
+  changeType: string;
+  priority: string;
+  submittedAt: string;
+}
 
 export function Artifacts() {
-  const [selectedFile, setSelectedFile] = useState<{ section: string; file: string } | undefined>({
-    section: 'development',
-    file: 'PaymentService.java',
+  const [selectedFile, setSelectedFile] = useState<
+    { section: string; file: string } | undefined
+  >({
+    section: "development",
+    file: "PaymentService.java",
   });
-  const [timelineExpanded, setTimelineExpanded] = useState(true);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [pendingChangeRequest, setPendingChangeRequest] = useState<
+    ChangeRequest | undefined
+  >();
 
   const handleFileSelect = (section: string, file: string) => {
     setSelectedFile({ section, file });
+    setShowTimeline(false);
   };
 
+  const handleRequestChanges = (data: {
+    description: string;
+    changeType: string;
+    priority: string;
+  }) => {
+    setPendingChangeRequest({
+      ...data,
+      submittedAt: new Date().toLocaleString("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }),
+    });
+    setShowTimeline(true);
+  };
+
+  if (showTimeline) {
+    return (
+      <ArtifactTimeline
+        fileName={selectedFile?.file}
+        section={selectedFile?.section}
+        changeRequest={pendingChangeRequest}
+        onBack={() => setShowTimeline(false)}
+      />
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Main 3-Panel Layout */}
+    <div className="h-full flex flex-col overflow-hidden relative">
+      {/* Main 2-Panel Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel: Artifact Explorer */}
-        <ArtifactExplorer onFileSelect={handleFileSelect} selectedFile={selectedFile} />
+        <ArtifactExplorer
+          onFileSelect={handleFileSelect}
+          selectedFile={selectedFile}
+        />
 
         {/* Center Panel: Code Viewer */}
         {selectedFile ? (
-          <CodeViewer fileName={selectedFile.file} section={selectedFile.section} />
+          <CodeViewer
+            fileName={selectedFile.file}
+            section={selectedFile.section}
+            onRequestChanges={handleRequestChanges}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-[#0A0F1E]">
             <div className="text-center">
-              <p className="text-gray-500 text-lg mb-2">No artifact selected</p>
-              <p className="text-gray-600 text-sm">Choose a file from the explorer to view</p>
+              <p className="text-gray-400 text-lg mb-2">No artifact selected</p>
+              <p className="text-gray-500 text-sm">
+                Choose a file from the explorer to view
+              </p>
             </div>
           </div>
         )}
-
-        {/* Right Panel: AI Insights */}
-        <AIInsights />
       </div>
 
-      {/* Bottom Panel: Artifact Timeline (Collapsible) */}
-      <div className="border-t border-white/10">
+      {/* Floating CTA Buttons */}
+      <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-40">
+        {/* View Timeline Button */}
         <button
-          onClick={() => setTimelineExpanded(!timelineExpanded)}
-          className="w-full flex items-center justify-between px-6 py-2 bg-[#111827] hover:bg-[#1a1f2e] transition-all"
+          onClick={() => setShowTimeline(true)}
+          className="flex items-center gap-3 px-6 py-4 bg-[#111827] hover:bg-[#1a2235] text-white rounded-2xl shadow-2xl shadow-black/50 transition-all hover:scale-105 backdrop-blur-xl border border-white/10 hover:border-[#6366F1]/40"
         >
-          <span className="text-sm font-medium text-white">Artifact Timeline</span>
-          {timelineExpanded ? (
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronUp className="w-4 h-4 text-gray-400" />
-          )}
+          <GitCommit className="w-5 h-5 text-[#8B5CF6]" />
+          <span className="font-semibold text-sm">View Timeline</span>
         </button>
-        {timelineExpanded && (
-          <div className="max-h-[400px] overflow-y-auto">
-            <ArtifactTimeline />
+
+        {/* AI Insights Button */}
+        <button
+          onClick={() => setAiPanelOpen(true)}
+          className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5558E3] hover:to-[#7C3AED] text-white rounded-2xl shadow-2xl shadow-[#6366F1]/50 transition-all hover:scale-105 backdrop-blur-xl border border-white/20"
+        >
+          <div className="relative">
+            <Sparkles className="w-5 h-5 animate-pulse" />
+            <div className="absolute inset-0 animate-ping">
+              <Sparkles className="w-5 h-5 opacity-20" />
+            </div>
           </div>
-        )}
+          <span className="font-semibold text-sm">AI Insights</span>
+        </button>
       </div>
+
+      {/* AI Insights Slide-in Panel */}
+      <AIInsights isOpen={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
     </div>
   );
 }
