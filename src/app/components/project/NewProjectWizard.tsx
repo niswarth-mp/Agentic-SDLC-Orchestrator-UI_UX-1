@@ -1,5 +1,14 @@
-import { useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Sparkles, Code, Upload, CheckCircle, FileText } from 'lucide-react';
+import { useState } from "react";
+import {
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Sparkles,
+  Code,
+  Upload,
+  CheckCircle,
+  FileText,
+} from "lucide-react";
 
 interface NewProjectWizardProps {
   isOpen: boolean;
@@ -7,8 +16,8 @@ interface NewProjectWizardProps {
   onComplete: (projectId: string) => void;
 }
 
-type ProjectMode = 'greenfield' | 'brownfield';
-type ProjectType = 'web' | 'api' | 'mobile' | 'ml' | 'data-pipeline';
+type ProjectMode = "greenfield" | "brownfield";
+type ProjectType = "web" | "api" | "mobile" | "ml" | "data-pipeline";
 
 interface ProjectConfig {
   mode: ProjectMode;
@@ -24,30 +33,70 @@ interface ProjectConfig {
 }
 
 const templates = [
-  { id: 'java-microservice', name: 'Java Microservice', language: 'java', description: 'Spring Boot + Maven + Docker', icon: '☕' },
-  { id: 'python-fastapi', name: 'Python FastAPI', language: 'python', description: 'FastAPI + SQLAlchemy + Docker', icon: '🐍' },
-  { id: 'react-frontend', name: 'React Frontend', language: 'typescript', description: 'React + TypeScript + Vite', icon: '⚛️' },
-  { id: 'node-express', name: 'Node.js Express', language: 'javascript', description: 'Express + MongoDB + Docker', icon: '🟢' },
-  { id: 'ml-pipeline', name: 'ML Pipeline', language: 'python', description: 'PyTorch + MLflow + Kubernetes', icon: '🤖' },
-  { id: 'blank', name: 'Blank Project', language: '', description: 'Start from scratch with no template', icon: '📄' },
+  {
+    id: "java-microservice",
+    name: "Java Microservice",
+    language: "java",
+    description: "Spring Boot + Maven + Docker",
+    icon: "☕",
+  },
+  {
+    id: "python-fastapi",
+    name: "Python FastAPI",
+    language: "python",
+    description: "FastAPI + SQLAlchemy + Docker",
+    icon: "🐍",
+  },
+  {
+    id: "react-frontend",
+    name: "React Frontend",
+    language: "typescript",
+    description: "React + TypeScript + Vite",
+    icon: "⚛️",
+  },
+  {
+    id: "node-express",
+    name: "Node.js Express",
+    language: "javascript",
+    description: "Express + MongoDB + Docker",
+    icon: "🟢",
+  },
+  {
+    id: "ml-pipeline",
+    name: "ML Pipeline",
+    language: "python",
+    description: "PyTorch + MLflow + Kubernetes",
+    icon: "🤖",
+  },
+  {
+    id: "blank",
+    name: "Blank Project",
+    language: "",
+    description: "Start from scratch with no template",
+    icon: "📄",
+  },
 ];
 
-export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWizardProps) {
+export function NewProjectWizard({
+  isOpen,
+  onClose,
+  onComplete,
+}: NewProjectWizardProps) {
   const [step, setStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
   const [config, setConfig] = useState<ProjectConfig>({
-    mode: 'greenfield',
-    description: '',
-    projectType: 'web',
-    language: 'java',
-    template: 'java-microservice',
-    appName: '',
-    environment: 'staging',
-    pipeline: 'default',
+    mode: "greenfield",
+    description: "",
+    projectType: "web",
+    language: "java",
+    template: "java-microservice",
+    appName: "",
+    environment: "staging",
+    pipeline: "default",
     referenceFiles: [],
   });
 
-  const totalSteps = config.mode === 'brownfield' ? 5 : 4;
+  const totalSteps = config.mode === "brownfield" ? 5 : 4;
 
   const handleNext = () => {
     if (step < totalSteps) setStep(step + 1);
@@ -61,9 +110,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
     setIsCreating(true);
 
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const projectId = 'proj_' + Math.random().toString(36).substr(2, 9);
+    const projectId = "proj_" + Math.random().toString(36).substr(2, 9);
     setIsCreating(false);
     onComplete(projectId);
   };
@@ -74,7 +123,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
 
   const handleFileUpload = (files: FileList | null) => {
     if (files) {
-      updateConfig({ referenceFiles: [...config.referenceFiles, ...Array.from(files)] });
+      updateConfig({
+        referenceFiles: [...config.referenceFiles, ...Array.from(files)],
+      });
     }
   };
 
@@ -97,8 +148,12 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white">Create New Project</h2>
-                <p className="text-sm text-gray-400 mt-1">AI-powered project initialization workflow</p>
+                <h2 className="text-2xl font-bold text-white">
+                  Create New Project
+                </h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  AI-powered project initialization workflow
+                </p>
               </div>
             </div>
             <button
@@ -115,7 +170,7 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
               <div key={i} className="flex items-center flex-1">
                 <div
                   className={`h-1 flex-1 rounded-full transition-all ${
-                    i < step ? 'bg-[#6366F1]' : 'bg-white/10'
+                    i < step ? "bg-[#6366F1]" : "bg-white/10"
                   }`}
                 />
                 {i < totalSteps - 1 && <div className="w-2" />}
@@ -123,14 +178,16 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
             ))}
           </div>
           <div className="flex justify-between mt-2">
-            <span className="text-xs text-gray-400">Step {step} of {totalSteps}</span>
             <span className="text-xs text-gray-400">
-              {step === 1 && 'Project Mode'}
-              {step === 2 && 'Basic Information'}
-              {step === 3 && 'Template Selection'}
-              {step === 4 && config.mode === 'brownfield' && 'Repository'}
-              {step === 4 && config.mode === 'greenfield' && 'Reference Files'}
-              {step === 5 && 'Reference Files'}
+              Step {step} of {totalSteps}
+            </span>
+            <span className="text-xs text-gray-400">
+              {step === 1 && "Project Mode"}
+              {step === 2 && "Basic Information"}
+              {step === 3 && "Template Selection"}
+              {step === 4 && config.mode === "brownfield" && "Repository"}
+              {step === 4 && config.mode === "greenfield" && "Reference Files"}
+              {step === 5 && "Reference Files"}
             </span>
           </div>
         </div>
@@ -141,30 +198,37 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Choose Project Mode</h3>
-                <p className="text-sm text-gray-400">Start from scratch or import an existing codebase</p>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Choose Project Mode
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Start from scratch or import an existing codebase
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <button
-                  onClick={() => updateConfig({ mode: 'greenfield' })}
+                  onClick={() => updateConfig({ mode: "greenfield" })}
                   className={`p-6 border-2 rounded-xl transition-all text-left ${
-                    config.mode === 'greenfield'
-                      ? 'border-[#6366F1] bg-[#6366F1]/10'
-                      : 'border-white/10 hover:border-white/20'
+                    config.mode === "greenfield"
+                      ? "border-[#6366F1] bg-[#6366F1]/10"
+                      : "border-white/10 hover:border-white/20"
                   }`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 bg-[#22C55E]/10 rounded-lg">
                       <Sparkles className="w-6 h-6 text-[#22C55E]" />
                     </div>
-                    {config.mode === 'greenfield' && (
+                    {config.mode === "greenfield" && (
                       <CheckCircle className="w-6 h-6 text-[#6366F1]" />
                     )}
                   </div>
-                  <h4 className="text-lg font-semibold text-white mb-2">Greenfield Project</h4>
+                  <h4 className="text-lg font-semibold text-white mb-2">
+                    Greenfield Project
+                  </h4>
                   <p className="text-sm text-gray-400">
-                    Start a brand new project from scratch with AI-generated architecture and code
+                    Start a brand new project from scratch with AI-generated
+                    architecture and code
                   </p>
                   <div className="mt-4 flex items-center gap-2">
                     <span className="px-2 py-1 bg-[#22C55E]/10 text-[#22C55E] text-xs rounded-full">
@@ -174,24 +238,27 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                 </button>
 
                 <button
-                  onClick={() => updateConfig({ mode: 'brownfield' })}
+                  onClick={() => updateConfig({ mode: "brownfield" })}
                   className={`p-6 border-2 rounded-xl transition-all text-left ${
-                    config.mode === 'brownfield'
-                      ? 'border-[#6366F1] bg-[#6366F1]/10'
-                      : 'border-white/10 hover:border-white/20'
+                    config.mode === "brownfield"
+                      ? "border-[#6366F1] bg-[#6366F1]/10"
+                      : "border-white/10 hover:border-white/20"
                   }`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 bg-[#F59E0B]/10 rounded-lg">
                       <Code className="w-6 h-6 text-[#F59E0B]" />
                     </div>
-                    {config.mode === 'brownfield' && (
+                    {config.mode === "brownfield" && (
                       <CheckCircle className="w-6 h-6 text-[#6366F1]" />
                     )}
                   </div>
-                  <h4 className="text-lg font-semibold text-white mb-2">Brownfield Project</h4>
+                  <h4 className="text-lg font-semibold text-white mb-2">
+                    Brownfield Project
+                  </h4>
                   <p className="text-sm text-gray-400">
-                    Import an existing codebase and let AI analyze, enhance, and modernize it
+                    Import an existing codebase and let AI analyze, enhance, and
+                    modernize it
                   </p>
                   <div className="mt-4 flex items-center gap-2">
                     <span className="px-2 py-1 bg-[#F59E0B]/10 text-[#F59E0B] text-xs rounded-full">
@@ -207,8 +274,12 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Basic Information</h3>
-                <p className="text-sm text-gray-400">Provide essential details about your project</p>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Basic Information
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Provide essential details about your project
+                </p>
               </div>
 
               <div className="space-y-4">
@@ -218,13 +289,16 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                   </label>
                   <textarea
                     value={config.description}
-                    onChange={(e) => updateConfig({ description: e.target.value })}
+                    onChange={(e) =>
+                      updateConfig({ description: e.target.value })
+                    }
                     placeholder="Build a retail e-commerce platform with microservices..."
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6366F1] resize-none"
                     rows={4}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Describe what you want to build. AI will use this to generate requirements.
+                    Describe what you want to build. AI will use this to
+                    generate requirements.
                   </p>
                 </div>
 
@@ -236,7 +310,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                     <input
                       type="text"
                       value={config.appName}
-                      onChange={(e) => updateConfig({ appName: e.target.value })}
+                      onChange={(e) =>
+                        updateConfig({ appName: e.target.value })
+                      }
                       placeholder="retail-platform"
                       className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                     />
@@ -248,7 +324,11 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                     </label>
                     <select
                       value={config.projectType}
-                      onChange={(e) => updateConfig({ projectType: e.target.value as ProjectType })}
+                      onChange={(e) =>
+                        updateConfig({
+                          projectType: e.target.value as ProjectType,
+                        })
+                      }
                       className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                     >
                       <option value="web">Web Application</option>
@@ -267,7 +347,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                     </label>
                     <select
                       value={config.language}
-                      onChange={(e) => updateConfig({ language: e.target.value })}
+                      onChange={(e) =>
+                        updateConfig({ language: e.target.value })
+                      }
                       className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                     >
                       <option value="java">Java</option>
@@ -286,7 +368,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                     </label>
                     <select
                       value={config.environment}
-                      onChange={(e) => updateConfig({ environment: e.target.value })}
+                      onChange={(e) =>
+                        updateConfig({ environment: e.target.value })
+                      }
                       className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                     >
                       <option value="development">Development</option>
@@ -319,7 +403,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
           {step === 3 && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Choose a Template</h3>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Choose a Template
+                </h3>
                 <p className="text-sm text-gray-400">
                   Select a pre-configured template or start from scratch
                 </p>
@@ -327,15 +413,20 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
 
               <div className="grid grid-cols-2 gap-4">
                 {templates
-                  .filter(t => !t.language || t.language === config.language || t.id === 'blank')
+                  .filter(
+                    (t) =>
+                      !t.language ||
+                      t.language === config.language ||
+                      t.id === "blank",
+                  )
                   .map((template) => (
                     <button
                       key={template.id}
                       onClick={() => updateConfig({ template: template.id })}
                       className={`p-4 border-2 rounded-xl transition-all text-left ${
                         config.template === template.id
-                          ? 'border-[#6366F1] bg-[#6366F1]/10'
-                          : 'border-white/10 hover:border-white/20'
+                          ? "border-[#6366F1] bg-[#6366F1]/10"
+                          : "border-white/10 hover:border-white/20"
                       }`}
                     >
                       <div className="flex items-start justify-between mb-3">
@@ -344,8 +435,12 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                           <CheckCircle className="w-5 h-5 text-[#6366F1]" />
                         )}
                       </div>
-                      <h4 className="text-base font-semibold text-white mb-1">{template.name}</h4>
-                      <p className="text-xs text-gray-400">{template.description}</p>
+                      <h4 className="text-base font-semibold text-white mb-1">
+                        {template.name}
+                      </h4>
+                      <p className="text-xs text-gray-400">
+                        {template.description}
+                      </p>
                     </button>
                   ))}
               </div>
@@ -353,11 +448,15 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
           )}
 
           {/* Step 4: Repository (Brownfield) */}
-          {step === 4 && config.mode === 'brownfield' && (
+          {step === 4 && config.mode === "brownfield" && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Repository Configuration</h3>
-                <p className="text-sm text-gray-400">Connect your existing codebase</p>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Repository Configuration
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Connect your existing codebase
+                </p>
               </div>
 
               <div>
@@ -366,13 +465,14 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                 </label>
                 <input
                   type="url"
-                  value={config.repo || ''}
+                  value={config.repo || ""}
                   onChange={(e) => updateConfig({ repo: e.target.value })}
                   placeholder="https://github.com/yourorg/yourrepo"
                   className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  AI will clone and analyze your codebase to understand the architecture
+                  AI will clone and analyze your codebase to understand the
+                  architecture
                 </p>
               </div>
 
@@ -380,7 +480,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                 <div className="flex items-start gap-3">
                   <Sparkles className="w-5 h-5 text-[#6366F1] flex-shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-sm font-medium text-white mb-1">AI Analysis</h4>
+                    <h4 className="text-sm font-medium text-white mb-1">
+                      AI Analysis
+                    </h4>
                     <p className="text-xs text-gray-300">
                       Our AI agents will analyze your codebase to understand:
                     </p>
@@ -397,10 +499,13 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
           )}
 
           {/* Step 4/5: Reference Files */}
-          {((step === 4 && config.mode === 'greenfield') || (step === 5 && config.mode === 'brownfield')) && (
+          {((step === 4 && config.mode === "greenfield") ||
+            (step === 5 && config.mode === "brownfield")) && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">Reference Documents (Optional)</h3>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  Reference Documents (Optional)
+                </h3>
                 <p className="text-sm text-gray-400">
                   Upload PDFs, wikis, or documentation to provide context
                 </p>
@@ -417,7 +522,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                 />
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-white font-medium mb-1">Click to upload files</p>
+                  <p className="text-white font-medium mb-1">
+                    Click to upload files
+                  </p>
                   <p className="text-sm text-gray-400">
                     PDF, DOC, TXT, or MD files up to 10MB each
                   </p>
@@ -426,7 +533,9 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
 
               {config.referenceFiles.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-300">Uploaded Files</p>
+                  <p className="text-sm font-medium text-gray-300">
+                    Uploaded Files
+                  </p>
                   {config.referenceFiles.map((file, index) => (
                     <div
                       key={index}
@@ -477,7 +586,7 @@ export function NewProjectWizard({ isOpen, onClose, onComplete }: NewProjectWiza
                   onClick={handleNext}
                   disabled={
                     (step === 2 && (!config.description || !config.appName)) ||
-                    (step === 4 && config.mode === 'brownfield' && !config.repo)
+                    (step === 4 && config.mode === "brownfield" && !config.repo)
                   }
                   className="flex items-center gap-2 px-6 py-2 bg-[#6366F1] hover:bg-[#5558E3] text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#6366F1]/20"
                 >
