@@ -1,322 +1,315 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Plus, Folder, Calendar, ChevronRight, ArrowLeft } from "lucide-react";
-import { ProjectSetupChat } from "../components/workspace/ProjectSetupChat";
-import { TaskTracker, Task } from "../components/workspace/TaskTracker";
 
 interface Project {
   id: string;
-  name: string;
-  type: "greenfield" | "brownfield";
-  lastActive: string;
-  status: "active" | "planning" | "completed";
-  confidence: number;
+  name: string; // config.app_name
+  phase: string;
+  env?: string; // config.env
+  pipeline?: string; // pipeline_name
+  version?: number;
+  created?: string;
+  description?: string;
+  projectType?: string; // project_type/raw (kept but not used in UI)
 }
 
-const INITIAL_PROJECTS: Project[] = [
-  {
-    id: "payment-api",
-    name: "Payment API",
-    type: "greenfield",
-    lastActive: "2 hours ago",
-    status: "active",
-    confidence: 92,
+const PHASE_CONFIG: Record<string, { label: string; badgeClass: string }> = {
+  idea: { label: "Idea", badgeClass: "bg-gray-100 text-gray-800" },
+  discovery: {
+    label: "Discovery",
+    badgeClass: "bg-indigo-100 text-indigo-800",
   },
-  {
-    id: "retail-ui",
-    name: "Retail UI",
-    type: "brownfield",
-    lastActive: "Yesterday",
-    status: "active",
-    confidence: 87,
+  design: { label: "Design", badgeClass: "bg-pink-100 text-pink-800" },
+  implementation: {
+    label: "Implementation",
+    badgeClass: "bg-green-100 text-green-800",
   },
-  {
-    id: "auth-service",
-    name: "Auth Service",
-    type: "greenfield",
-    lastActive: "3 days ago",
-    status: "planning",
-    confidence: 78,
+  deployment: { label: "Deployment", badgeClass: "bg-blue-100 text-blue-800" },
+  failed: { label: "Failed", badgeClass: "bg-red-100 text-red-800" },
+  approval_design: {
+    label: "Approval (Design)",
+    badgeClass: "bg-yellow-100 text-yellow-800",
   },
-  {
-    id: "notification-worker",
-    name: "Notification Worker",
-    type: "brownfield",
-    lastActive: "Last week",
-    status: "active",
-    confidence: 95,
+  // New phases requested — distinct, accessible colors
+  req_design: {
+    label: "Req Design",
+    badgeClass: "bg-purple-100 text-purple-800",
   },
-];
-
-const STATUS_CONFIG = {
-  active: { color: "bg-[#22C55E]", label: "Active" },
-  planning: { color: "bg-[#F59E0B]", label: "Planning" },
-  completed: { color: "bg-gray-500", label: "Completed" },
+  development: {
+    label: "Development",
+    badgeClass: "bg-green-50 text-green-900",
+  },
+  security_scan: {
+    label: "Security Scan",
+    badgeClass: "bg-red-100 text-red-800",
+  },
+  testing: { label: "Testing", badgeClass: "bg-yellow-50 text-yellow-900" },
+  infra_provision: {
+    label: "Infra Provision",
+    badgeClass: "bg-teal-100 text-teal-800",
+  },
+  gitops_deploy: {
+    label: "GitOps Deploy",
+    badgeClass: "bg-blue-50 text-blue-900",
+  },
 };
 
-export function Projects() {
-  const location = useLocation();
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const [currentTasks, setCurrentTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [newProjectId, setNewProjectId] = useState<string | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // Handle new project from AI Workspace
-  useEffect(() => {
-    const state = location.state as { newProject?: Project } | null;
-    if (state?.newProject) {
-      const newProject = state.newProject;
-      // Check if project already exists to avoid duplicates
-      if (!projects.find((p) => p.id === newProject.id)) {
-        setProjects([newProject, ...projects]);
-        setNewProjectId(newProject.id);
-        setShowSuccessMessage(true);
-
-        // Scroll to top to show the new project
-        setTimeout(() => {
-          scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-        }, 100);
-
-        setTimeout(() => {
-          setShowSuccessMessage(false);
-        }, 3000);
-        setTimeout(() => {
-          setNewProjectId(null);
-        }, 5000);
-      }
-      // Clear the state
-      window.history.replaceState({}, document.title);
+function getPhaseConfig(phase?: string) {
+  if (!phase)
+    return {
+      label: phase ?? "Unknown",
+      badgeClass: "bg-gray-100 text-gray-800",
+    };
+  return (
+    PHASE_CONFIG[phase] ?? {
+      label: phase,
+      badgeClass: "bg-gray-100 text-gray-800",
     }
-  }, [location.state]);
+  );
+}
+
+async function fetchProjects(limit = 50): Promise<Project[]> {
+  const res = await fetch(`http://localhost:8002/api/projects?limit=${limit}`);
+  if (!res.ok) throw new Error("Failed to fetch projects");
+  const data = await res.json();
+  // Normalize to Project shape using canonical response hints
+  return (data.projects ?? data ?? [])
+    .map((p: any) => ({
+      id: String(p.project_id ?? p.id ?? ""),
+      name: String(
+        p.config?.app_name ?? p.config?.name ?? p.name ?? "Untitled Project",
+      ),
+      phase: String(p.phase ?? ""),
+      env: p.config?.env ?? p.env,
+      pipeline: p.pipeline_name ?? p.pipeline,
+      version: p.version,
+      created: p.created,
+      description:
+        p.description ?? p.config?.description ?? p.config?.constraints ?? "",
+      projectType: String(p.project_type ?? p.type ?? ""),
+    }))
+    .filter((pr: Project) => !!pr.id);
+}
+
+interface ProjectsProps {
+  initialProjects?: Project[];
+}
+
+export default function Projects({
+  initialProjects,
+}: ProjectsProps): React.ReactElement {
+  const [projects, setProjects] = useState<Project[]>(initialProjects ?? []);
+  const [isFetching, setIsFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [newProjectId, setNewProjectId] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    let mounted = true;
+    setIsFetching(true);
+    fetchProjects(50)
+      .then((list) => {
+        if (!mounted) return;
+        setProjects(list);
+        setFetchError(null);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        setFetchError(String(err.message || err));
+      })
+      .finally(() => mounted && setIsFetching(false));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // If another route created a project and passed it through location.state, prepend it
+  useEffect(() => {
+    const state = (location as any).state;
+    if (state && state.newProject) {
+      const np = state.newProject as Project;
+      setProjects((prev) => [np, ...prev]);
+      setNewProjectId(np.id ?? null);
+      // clear history state to avoid duplicates
+      try {
+        window.history.replaceState({}, document.title);
+      } catch {}
+    }
+  }, [location]);
 
   const handleProjectComplete = (newProject: Project) => {
-    setProjects([newProject, ...projects]);
+    setProjects((prev) => [newProject, ...prev]);
     setNewProjectId(newProject.id);
-    setShowSuccessMessage(true);
     setIsCreatingProject(false);
-    setCurrentTasks([]);
-
-    // Scroll to top to show the new project
-    setTimeout(() => {
-      scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    }, 100);
-
-    setTimeout(() => {
-      setShowSuccessMessage(false);
-    }, 3000);
-    setTimeout(() => {
-      setNewProjectId(null);
-    }, 5000);
+    setTimeout(
+      () =>
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" }),
+      120,
+    );
   };
 
-  // Show chat interface when creating project
-  if (isCreatingProject) {
-    return (
-      <div className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
-        {/* Back Button Header */}
-        <div className="h-16 border-b border-gray-200 dark:border-white/10 px-6 flex items-center flex-shrink-0">
-          <button
-            onClick={() => setIsCreatingProject(false)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all text-sm font-medium"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Projects
-          </button>
-        </div>
-
-        <div className="flex-1 flex overflow-hidden min-h-0">
-          {/* Chat Interface */}
-          <div className="flex-1 min-w-0">
-            <ProjectSetupChat
-              onClose={() => {
-                setIsCreatingProject(false);
-                setCurrentTasks([]);
-              }}
-              onTaskUpdate={setCurrentTasks}
-              onProjectComplete={handleProjectComplete}
-            />
-          </div>
-
-          {/* Task Tracker */}
-          <TaskTracker projectId={null} tasks={currentTasks} />
-        </div>
-      </div>
-    );
-  }
-
-  // Show projects list
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
-      {/* Header */}
-      <div className="px-8 py-6 border-b border-gray-200 dark:border-white/10">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Projects
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400">
-              Manage all your SDLC projects
-            </p>
-          </div>
+    <div className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
+      <div className="h-16 border-b border-gray-200 dark:border-white/10 px-6 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Projects
+          </h2>
+          <p className="text-sm text-gray-500">{projects.length} projects</p>
+        </div>
+        <div>
           <button
             onClick={() => setIsCreatingProject(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5558E3] hover:to-[#7C4FE0] text-white rounded-xl font-medium transition-all shadow-lg shadow-[#6366F1]/20"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-lg"
           >
-            <Plus className="w-5 h-5" />
-            New Project
+            <Plus className="w-4 h-4" />
+            Create Project
           </button>
         </div>
       </div>
 
-      {/* Success Message */}
-      {showSuccessMessage && (
-        <div className="mx-8 mt-6 bg-gradient-to-r from-[#22C55E]/10 to-[#10B981]/10 border border-[#22C55E]/30 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#22C55E]/20 border border-[#22C55E]/40 rounded-full flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-[#22C55E]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">
-              Project created successfully!
-            </p>
-            <p className="text-xs text-gray-400">
-              Your new project has been added to the list.
-            </p>
+      {isCreatingProject ? (
+        <div className="p-6">
+          <button
+            onClick={() => setIsCreatingProject(false)}
+            className="text-sm text-gray-500 mb-4 inline-flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Projects
+          </button>
+          <div className="p-6 bg-white dark:bg-[#111827] rounded-lg">
+            Project creation UI goes here.
           </div>
         </div>
-      )}
+      ) : (
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-8 py-6"
+        >
+          <div className="max-w-5xl mx-auto space-y-4">
+            {isFetching && (
+              <div className="text-center text-sm text-gray-500">
+                Loading projects…
+              </div>
+            )}
+            {fetchError && (
+              <div className="text-center text-sm text-red-500">
+                {fetchError}
+              </div>
+            )}
 
-      {/* Projects Grid - Vertical Layout */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-8 py-6"
-      >
-        <div className="max-w-5xl mx-auto space-y-4">
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              to={`/projects/${project.id}`}
-              className="block group"
-            >
-              <div
-                className={`bg-white dark:bg-[#111827] border rounded-2xl p-6 transition-all hover:bg-gray-50 dark:hover:bg-[#111827]/80 ${
-                  project.id === newProjectId
-                    ? "border-[#22C55E]/50 shadow-lg shadow-[#22C55E]/20 animate-pulse"
-                    : "border-gray-200 dark:border-white/10 hover:border-[#6366F1]/30"
-                }`}
+            {projects.map((project) => (
+              <Link
+                key={project.id}
+                to={`/projects/${project.id}`}
+                className="block group"
               >
-                <div className="flex items-center justify-between gap-6">
-                  {/* Left: Project Info */}
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="w-12 h-12 bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Folder className="w-6 h-6 text-white" />
+                <div
+                  className={`bg-white dark:bg-[#111827] border rounded-[28px] p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6366F1]/40 hover:shadow-lg ${project.id === newProjectId ? "border-[#22C55E]/50 shadow-[#22C55E]/10" : "border-gray-200 dark:border-white/10"}`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-white shadow-inner">
+                      <Folder className="w-6 h-6" />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                          {project.name}
-                        </h3>
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider flex-shrink-0 ${
-                            project.type === "greenfield"
-                              ? "bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20"
-                              : "bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/20"
-                          }`}
-                        >
-                          {project.type}
-                        </span>
-                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="min-w-0">
+                          <h3 className="text-5xl font-extrabold text-gray-900 dark:text-white truncate">
+                            {project.name}
+                          </h3>
+                          {project.description ? (
+                            <p className="text-1xl font-extrabold leading-6 text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">
+                              {project.description}
+                            </p>
+                          ) : (
+                            <p className="text-sm leading-6 text-gray-500 dark:text-gray-400 mt-2">
+                              No description available.
+                            </p>
+                          )}
+                        </div>
 
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`w-2 h-2 rounded-full ${STATUS_CONFIG[project.status].color}`}
-                          />
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {STATUS_CONFIG[project.status].label}
+                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${getPhaseConfig(project.phase).badgeClass}`}
+                          >
+                            {getPhaseConfig(project.phase).label}
                           </span>
+                          {project.env ? (
+                            <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-gray-700 bg-gray-100 dark:text-gray-200 dark:bg-white/10 border border-gray-200 dark:border-white/10">
+                              {project.env}
+                            </span>
+                          ) : null}
                         </div>
-                        <span className="text-gray-400 dark:text-gray-600">
-                          •
-                        </span>
-                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                          <Calendar className="w-4 h-4" />
-                          <span>{project.lastActive}</span>
-                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-3 text-sm text-gray-600 dark:text-gray-300">
+                        {project.pipeline ? (
+                          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3">
+                            <div className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                              Pipeline
+                            </div>
+                            <div className="mt-1 font-medium text-gray-900 dark:text-white truncate">
+                              {project.pipeline}
+                            </div>
+                          </div>
+                        ) : null}
+                        {project.version ? (
+                          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3">
+                            <div className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                              Version
+                            </div>
+                            <div className="mt-1 font-medium text-gray-900 dark:text-white">
+                              v{project.version}
+                            </div>
+                          </div>
+                        ) : null}
+                        {project.created ? (
+                          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3">
+                            <div className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                              Created
+                            </div>
+                            <div className="mt-1 font-medium text-gray-900 dark:text-white">
+                              {new Date(project.created).toLocaleString()}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
 
-                  {/* Center: Confidence Bar */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">
-                        Confidence
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="w-32 h-2 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              project.confidence >= 90
-                                ? "bg-[#22C55E]"
-                                : project.confidence >= 75
-                                  ? "bg-[#F59E0B]"
-                                  : "bg-[#EF4444]"
-                            }`}
-                            style={{ width: `${project.confidence}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white w-10 text-right">
-                          {project.confidence}%
-                        </span>
-                      </div>
-                    </div>
+                  <div className="mt-6 flex justify-end">
+                    <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 transition-colors group-hover:text-[#6366F1]" />
                   </div>
-
-                  {/* Right: Arrow */}
-                  <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 group-hover:text-[#6366F1] transition-colors flex-shrink-0" />
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))}
 
-          {/* Empty State */}
-          {projects.length === 0 && (
-            <div className="text-center py-16">
-              <div className="w-20 h-20 bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] rounded-3xl flex items-center justify-center mx-auto mb-6 opacity-50">
-                <Folder className="w-10 h-10 text-white" />
+            {projects.length === 0 && !isFetching && (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] rounded-3xl flex items-center justify-center mx-auto mb-6 opacity-50">
+                  <Folder className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  No projects yet
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  Create your first project to get started
+                </p>
+                <button
+                  onClick={() => setIsCreatingProject(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-xl font-medium"
+                >
+                  <Plus className="w-5 h-5" />
+                  Create Project
+                </button>
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">
-                No projects yet
-              </h3>
-              <p className="text-gray-400 mb-6">
-                Create your first project to get started
-              </p>
-              <button
-                onClick={() => setIsCreatingProject(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5558E3] hover:to-[#7C4FE0] text-white rounded-xl font-medium transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                Create Project
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
