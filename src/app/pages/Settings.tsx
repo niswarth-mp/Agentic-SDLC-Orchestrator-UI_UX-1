@@ -1,29 +1,84 @@
-import { Users, Cpu, Cloud, DollarSign, Settings as SettingsIcon } from 'lucide-react';
+import {
+  Users,
+  Cpu,
+  Cloud,
+  DollarSign,
+  Settings as SettingsIcon,
+  Sun,
+  Moon,
+} from "lucide-react";
+import { useTheme } from "../contexts/ThemeContext";
 
 export function Settings() {
+  const { theme, toggleTheme } = useTheme();
   const tenants = [
-    { name: 'Engineering Team', projects: 12, usage: '89%', cost: '$212/mo', status: 'active' },
-    { name: 'Product Team', projects: 5, usage: '45%', cost: '$87/mo', status: 'active' },
-    { name: 'Data Team', projects: 8, usage: '67%', cost: '$156/mo', status: 'active' },
+    {
+      name: "Engineering Team",
+      projects: 12,
+      usage: "89%",
+      cost: "$212/mo",
+      status: "active",
+    },
+    {
+      name: "Product Team",
+      projects: 5,
+      usage: "45%",
+      cost: "$87/mo",
+      status: "active",
+    },
+    {
+      name: "Data Team",
+      projects: 8,
+      usage: "67%",
+      cost: "$156/mo",
+      status: "active",
+    },
   ];
 
   const llmModels = [
-    { name: 'llama3.1:70b', type: 'Local', status: 'active', usage: '234k tokens' },
-    { name: 'GPT-4.1', type: 'OpenAI', status: 'active', usage: '156k tokens' },
-    { name: 'Claude Sonnet', type: 'Anthropic', status: 'inactive', usage: '0 tokens' },
+    {
+      name: "llama3.1:70b",
+      type: "Local",
+      status: "active",
+      usage: "234k tokens",
+    },
+    { name: "GPT-4.1", type: "OpenAI", status: "active", usage: "156k tokens" },
+    {
+      name: "Claude Sonnet",
+      type: "Anthropic",
+      status: "inactive",
+      usage: "0 tokens",
+    },
   ];
 
   const infrastructure = [
-    { name: 'Kubernetes', version: '1.28', status: 'healthy', nodes: 12 },
-    { name: 'ArgoCD', version: '2.9.3', status: 'healthy', apps: 24 },
-    { name: 'Terraform', version: '1.6.5', status: 'healthy', workspaces: 8 },
+    { name: "Kubernetes", version: "1.28", status: "healthy", nodes: 12 },
+    { name: "ArgoCD", version: "2.9.3", status: "healthy", apps: 24 },
+    { name: "Terraform", version: "1.6.5", status: "healthy", workspaces: 8 },
   ];
 
   return (
-    <div className="p-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-white mb-2">Settings & Administration</h1>
-        <p className="text-gray-400">Manage tenants, runtime capabilities, and system configuration</p>
+    <div className="p-8 space-y-8 bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Settings & Administration
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Manage tenants, runtime capabilities, and system configuration
+          </p>
+        </div>
+        <button
+          onClick={toggleTheme}
+          className="p-3 rounded-lg bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-[#1a2235] transition-all"
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? (
+            <Sun className="w-6 h-6 text-yellow-500" />
+          ) : (
+            <Moon className="w-6 h-6 text-gray-800" />
+          )}
+        </button>
       </div>
 
       {/* Tenant Management */}
@@ -31,7 +86,9 @@ export function Settings() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Users className="w-6 h-6 text-[#6366F1]" />
-            <h2 className="text-xl font-semibold text-white">Tenant Management</h2>
+            <h2 className="text-xl font-semibold text-white">
+              Tenant Management
+            </h2>
           </div>
           <button className="px-4 py-2 bg-[#6366F1] hover:bg-[#5558E3] text-white rounded-lg transition-all">
             Add Tenant
@@ -41,18 +98,35 @@ export function Settings() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Tenant Name</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Projects</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Usage</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Cost</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Status</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Actions</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  Tenant Name
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  Projects
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  Usage
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  Cost
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  Status
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {tenants.map((tenant) => (
-                <tr key={tenant.name} className="border-b border-white/5 hover:bg-white/5 transition-all">
-                  <td className="px-4 py-4 text-white font-medium">{tenant.name}</td>
+                <tr
+                  key={tenant.name}
+                  className="border-b border-white/5 hover:bg-white/5 transition-all"
+                >
+                  <td className="px-4 py-4 text-white font-medium">
+                    {tenant.name}
+                  </td>
                   <td className="px-4 py-4 text-gray-300">{tenant.projects}</td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
@@ -62,7 +136,9 @@ export function Settings() {
                           style={{ width: tenant.usage }}
                         />
                       </div>
-                      <span className="text-gray-300 text-sm">{tenant.usage}</span>
+                      <span className="text-gray-300 text-sm">
+                        {tenant.usage}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-4 text-gray-300">{tenant.cost}</td>
@@ -99,10 +175,12 @@ export function Settings() {
               >
                 <div>
                   <h3 className="text-white font-medium mb-1">{model.name}</h3>
-                  <p className="text-sm text-gray-400">{model.type} • {model.usage}</p>
+                  <p className="text-sm text-gray-400">
+                    {model.type} • {model.usage}
+                  </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {model.status === 'active' ? (
+                  {model.status === "active" ? (
                     <span className="w-2 h-2 bg-[#22C55E] rounded-full" />
                   ) : (
                     <span className="w-2 h-2 bg-gray-500 rounded-full" />
@@ -132,9 +210,16 @@ export function Settings() {
                 className="flex items-center justify-between p-4 bg-white/5 rounded-lg"
               >
                 <div>
-                  <h3 className="text-white font-medium mb-1">{service.name}</h3>
+                  <h3 className="text-white font-medium mb-1">
+                    {service.name}
+                  </h3>
                   <p className="text-sm text-gray-400">
-                    v{service.version} • {service.nodes ? `${service.nodes} nodes` : service.apps ? `${service.apps} apps` : `${service.workspaces} workspaces`}
+                    v{service.version} •{" "}
+                    {service.nodes
+                      ? `${service.nodes} nodes`
+                      : service.apps
+                        ? `${service.apps} apps`
+                        : `${service.workspaces} workspaces`}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
