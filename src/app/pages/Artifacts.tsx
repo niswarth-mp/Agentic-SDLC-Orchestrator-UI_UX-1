@@ -3,7 +3,8 @@ import { ArtifactExplorer } from "../components/artifacts/ArtifactExplorer";
 import { CodeViewer } from "../components/artifacts/CodeViewer";
 import { AIInsights } from "../components/artifacts/AIInsights";
 import { ArtifactTimeline } from "../components/artifacts/ArtifactTimeline";
-import { Sparkles, GitCommit } from "lucide-react";
+import { Sparkles, GitCommit, Sun, Moon } from "lucide-react";
+import { useTheme } from "../contexts/ThemeContext";
 
 interface ChangeRequest {
   description: string;
@@ -13,6 +14,7 @@ interface ChangeRequest {
 }
 
 export function Artifacts() {
+  const { theme, toggleTheme } = useTheme();
   const [selectedFile, setSelectedFile] = useState<
     { section: string; file: string } | undefined
   >({
@@ -61,7 +63,7 @@ export function Artifacts() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden relative">
+    <div className="h-full flex flex-col overflow-hidden relative bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
       {/* Main 2-Panel Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel: Artifact Explorer */}
@@ -78,10 +80,12 @@ export function Artifacts() {
             onRequestChanges={handleRequestChanges}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-[#0A0F1E]">
+          <div className="flex-1 flex items-center justify-center bg-gray-100 dark:bg-[#0A0F1E] transition-colors">
             <div className="text-center">
-              <p className="text-gray-400 text-lg mb-2">No artifact selected</p>
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">
+                No artifact selected
+              </p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
                 Choose a file from the explorer to view
               </p>
             </div>
@@ -91,6 +95,19 @@ export function Artifacts() {
 
       {/* Floating CTA Buttons */}
       <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-40">
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          className="flex items-center justify-center w-14 h-14 bg-[#111827] hover:bg-[#1a2235] text-white rounded-2xl shadow-2xl shadow-black/50 transition-all hover:scale-105 backdrop-blur-xl border border-white/10 hover:border-[#6366F1]/40"
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? (
+            <Sun className="w-5 h-5 text-yellow-400" />
+          ) : (
+            <Moon className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
+
         {/* View Timeline Button */}
         <button
           onClick={() => setShowTimeline(true)}
