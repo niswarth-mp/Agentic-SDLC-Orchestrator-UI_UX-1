@@ -6,6 +6,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { AIWorkspace } from "./pages/AIWorkspace";
 import Projects from "./pages/Projects";
 import { ProjectDetails } from "./pages/ProjectDetails";
+import { Requirements } from "./pages/Requirements";
 import { Pipelines } from "./pages/Pipelines";
 import { Approvals } from "./pages/Approvals";
 import { Artifacts } from "./pages/Artifacts";
@@ -67,6 +68,7 @@ export default function App() {
               element={<Projects initialProjects={projects} />}
             />
             <Route path="projects/:id" element={<ProjectDetails />} />
+            <Route path="requirements" element={<Requirements />} />
             <Route path="pipelines" element={<Pipelines />} />
             <Route path="approvals" element={<Approvals />} />
             <Route path="artifacts" element={<Artifacts />} />

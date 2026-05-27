@@ -1,13 +1,56 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, ExternalLink, CheckCircle } from "lucide-react";
+import {
+  Send,
+  Bot,
+  User,
+  Upload,
+  Video,
+  FileText,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Loader,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: string;
-  options?: { label: string; value: string }[];
-  integration?: "jira" | "ada";
+  type?:
+    | "text"
+    | "project-type"
+    | "file-upload"
+    | "video-upload"
+    | "jira-import"
+    | "epic-review"
+    | "story-review"
+    | "jira-project-selection"
+    | "jira-sync";
+  data?: any;
+}
+
+interface Epic {
+  id: string;
+  title: string;
+  description: string;
+  status: "pending" | "approved" | "rejected";
+  userStories: UserStory[];
+  expanded?: boolean;
+}
+
+interface UserStory {
+  id: string;
+  title: string;
+  description: string;
+  priority: "low" | "medium" | "high" | "critical";
+  storyPoints: number;
+  acceptanceCriteria: string[];
+  status: "pending" | "approved" | "rejected";
+  feedback?: string;
 }
 
 interface ProjectSetupChatProps {
@@ -16,19 +59,93 @@ interface ProjectSetupChatProps {
   onProjectComplete?: (project: any) => void;
 }
 
-const INITIAL_MESSAGES: Message[] = [
+const PRIORITY_COLORS = {
+  low: {
+    bg: "bg-gray-100 dark:bg-gray-800",
+    text: "text-gray-700 dark:text-gray-300",
+    dot: "bg-gray-500",
+  },
+  medium: {
+    bg: "bg-blue-100 dark:bg-blue-900/30",
+    text: "text-blue-700 dark:text-blue-300",
+    dot: "bg-blue-500",
+  },
+  high: {
+    bg: "bg-orange-100 dark:bg-orange-900/30",
+    text: "text-orange-700 dark:text-orange-300",
+    dot: "bg-orange-500",
+  },
+  critical: {
+    bg: "bg-red-100 dark:bg-red-900/30",
+    text: "text-red-700 dark:text-red-300",
+    dot: "bg-red-500",
+  },
+};
+
+const MOCK_EPICS: Epic[] = [
   {
     id: "1",
-    role: "assistant",
-    content:
-      "Hi! I'm here to help you set up your new project. Let's start by choosing the type of project you'd like to create:",
-    timestamp: new Date().toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    }),
-    options: [
-      { label: "Greenfield Project", value: "greenfield" },
-      { label: "Brownfield Project", value: "brownfield" },
+    title: "User Authentication & Authorization",
+    description:
+      "Implement secure user authentication system with role-based access control",
+    status: "pending",
+    expanded: false,
+    userStories: [
+      {
+        id: "1-1",
+        title: "User Registration",
+        description:
+          "As a new user, I want to register an account so that I can access the platform",
+        priority: "high",
+        storyPoints: 5,
+        status: "pending",
+        acceptanceCriteria: [
+          "User can register with email and password",
+          "Email verification is sent upon registration",
+          "Password must meet security requirements (8+ chars, special chars)",
+          "User receives welcome email after successful registration",
+        ],
+      },
+      {
+        id: "1-2",
+        title: "User Login",
+        description:
+          "As a registered user, I want to log in to my account so that I can access my data",
+        priority: "high",
+        storyPoints: 3,
+        status: "pending",
+        acceptanceCriteria: [
+          "User can log in with email and password",
+          "Invalid credentials show appropriate error message",
+          "Session is created and maintained across browser tabs",
+          "Remember me option available for persistent login",
+        ],
+      },
+    ],
+  },
+  {
+    id: "2",
+    title: "Product Catalog Management",
+    description:
+      "Build comprehensive product catalog with search, filtering, and categorization",
+    status: "pending",
+    expanded: false,
+    userStories: [
+      {
+        id: "2-1",
+        title: "Product Listing",
+        description:
+          "As a user, I want to browse products so that I can find items to purchase",
+        priority: "high",
+        storyPoints: 8,
+        status: "pending",
+        acceptanceCriteria: [
+          "Products displayed in grid/list view",
+          "Each product shows image, name, price, and rating",
+          "Pagination or infinite scroll implemented",
+          "Loading states for better UX",
+        ],
+      },
     ],
   },
 ];
@@ -38,20 +155,56 @@ export function ProjectSetupChat({
   onTaskUpdate,
   onProjectComplete,
 }: ProjectSetupChatProps) {
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      role: "assistant",
+      content:
+        "Hi! I'm your AI Requirements Assistant. Let's transform your business requirements into actionable user stories. First, what type of project are you working on?",
+      timestamp: new Date().toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      type: "project-type",
+    },
+  ]);
   const [input, setInput] = useState("");
   const [projectType, setProjectType] = useState<
-    "greenfield" | "brownfield" | null
+    "brownfield" | "greenfield" | null
   >(null);
-  const [jiraConnected, setJiraConnected] = useState(false);
-  const [adaConnected, setAdaConnected] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [conversationStep, setConversationStep] = useState<
-    "type" | "name" | "stack" | "features" | "complete"
-  >("type");
-  const [projectName, setProjectName] = useState("");
-  const [techStack, setTechStack] = useState("");
+  const [uploadedDocument, setUploadedDocument] = useState<File | null>(null);
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+  const [description, setDescription] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [epics, setEpics] = useState<Epic[]>([]);
+  const [regeneratingEpicId, setRegeneratingEpicId] = useState<string | null>(
+    null,
+  );
+  const [regeneratingStoryId, setRegeneratingStoryId] = useState<string | null>(
+    null,
+  );
+  const [selectedJiraProject, setSelectedJiraProject] = useState<string | null>(
+    null,
+  );
+  const [currentStage, setCurrentStage] = useState<
+    | "project-type"
+    | "upload"
+    | "processing"
+    | "epic-review"
+    | "story-review"
+    | "jira-project-selection"
+    | "jira-sync"
+    | "complete"
+  >("project-type");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const jiraProjects = [
+    { key: "ECOM", name: "E-Commerce Platform", tickets: 47 },
+    { key: "MOBILE", name: "Mobile App", tickets: 32 },
+    { key: "API", name: "API Services", tickets: 28 },
+    { key: "WEB", name: "Web Portal", tickets: 55 },
+    { key: "ADMIN", name: "Admin Dashboard", tickets: 19 },
+  ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -61,525 +214,485 @@ export function ProjectSetupChat({
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    // Update suggestions based on conversation step
-    if (conversationStep === "name") {
-      setSuggestions([
-        "E-commerce Platform",
-        "Payment Gateway",
-        "Analytics Dashboard",
-        "Mobile App Backend",
-      ]);
-    } else if (conversationStep === "stack") {
-      setSuggestions([
-        "React + Node.js",
-        "Python + FastAPI",
-        "Next.js + PostgreSQL",
-        "Vue.js + Express",
-      ]);
-    } else if (conversationStep === "features") {
-      setSuggestions([
-        "Authentication & Authorization",
-        "Payment Integration",
-        "Real-time Analytics",
-        "API Gateway",
-      ]);
-    } else {
-      setSuggestions([]);
-    }
-  }, [conversationStep]);
-
   const addMessage = (
     role: "user" | "assistant",
     content: string,
-    options?: { label: string; value: string }[],
-    integration?: "jira" | "ada",
+    type?: Message["type"],
+    data?: any,
   ) => {
     const newMessage: Message = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random(),
       role,
       content,
       timestamp: new Date().toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "2-digit",
       }),
-      options,
-      integration,
+      type: type || "text",
+      data,
     };
     setMessages((prev) => [...prev, newMessage]);
   };
 
-  const handleOptionClick = (value: string) => {
-    addMessage("user", value);
+  const handleProjectTypeSelect = (type: "brownfield" | "greenfield") => {
+    setProjectType(type);
+    setCurrentStage("upload");
+    addMessage(
+      "user",
+      type === "brownfield" ? "Brownfield Project" : "Greenfield Project",
+    );
 
     setTimeout(() => {
-      if (value === "greenfield") {
-        setProjectType("greenfield");
-        setConversationStep("name");
+      if (type === "brownfield") {
         addMessage(
           "assistant",
-          "Great! For a greenfield project, I'll help you set up everything from scratch. What would you like to name your project?",
+          "Great! For a brownfield project, you can upload your BRD/PRD documents, add videos, provide a description, and import existing Jira tickets. Let's start by uploading your documents:",
+          "file-upload",
         );
-      } else if (value === "brownfield") {
-        setProjectType("brownfield");
+      } else {
         addMessage(
           "assistant",
-          "Perfect! For a brownfield project, I can help you integrate with existing systems. Would you like to connect to Jira or Azure DevOps (ADA) to import your existing project data?",
+          "Perfect! For a greenfield project, you can upload your BRD/PRD documents, add videos, and provide a project description. Let's start:",
+          "file-upload",
         );
-        setTimeout(() => {
-          addMessage(
-            "assistant",
-            "Click below to connect your tools:",
-            undefined,
-            "jira",
-          );
-        }, 500);
       }
     }, 500);
+  };
+
+  const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadedDocument(file);
+      addMessage("user", `Uploaded document: ${file.name}`);
+      setTimeout(() => {
+        addMessage(
+          "assistant",
+          "Document uploaded successfully! Would you like to add a video demonstration? (Optional)",
+          "video-upload",
+        );
+      }, 500);
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadedVideo(file);
+      addMessage("user", `Uploaded video: ${file.name}`);
+    }
+  };
+
+  const handleSkipVideo = () => {
+    addMessage("user", "Skip video upload");
+    setTimeout(() => {
+      addMessage(
+        "assistant",
+        "No problem! Now, please provide a description of your project requirements and goals:",
+      );
+    }, 500);
+  };
+
+  const handleDescriptionSubmit = (desc: string) => {
+    if (!desc.trim()) return;
+
+    addMessage("user", desc);
+    setDescription(desc);
+    setInput("");
+
+    setTimeout(() => {
+      startProcessing();
+    }, 500);
+  };
+
+  const startProcessing = async () => {
+    setCurrentStage("processing");
+    setIsProcessing(true);
+    addMessage(
+      "assistant",
+      "🔄 Processing your documents and generating epics... This may take a moment.",
+    );
+
+    // Update tasks
+    if (onTaskUpdate) {
+      onTaskUpdate([
+        {
+          id: "1",
+          name: "Uploading documents",
+          status: "in-progress",
+          icon: "file",
+        },
+        {
+          id: "2",
+          name: "Analyzing requirements",
+          status: "pending",
+          icon: "sparkles",
+        },
+        {
+          id: "3",
+          name: "Generating epics",
+          status: "pending",
+          icon: "layers",
+        },
+        {
+          id: "4",
+          name: "Creating user stories",
+          status: "pending",
+          icon: "list",
+        },
+      ]);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    if (onTaskUpdate) {
+      onTaskUpdate([
+        {
+          id: "1",
+          name: "Uploading documents",
+          status: "completed",
+          icon: "file",
+        },
+        {
+          id: "2",
+          name: "Analyzing requirements",
+          status: "in-progress",
+          icon: "sparkles",
+        },
+        {
+          id: "3",
+          name: "Generating epics",
+          status: "pending",
+          icon: "layers",
+        },
+        {
+          id: "4",
+          name: "Creating user stories",
+          status: "pending",
+          icon: "list",
+        },
+      ]);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    if (onTaskUpdate) {
+      onTaskUpdate([
+        {
+          id: "1",
+          name: "Uploading documents",
+          status: "completed",
+          icon: "file",
+        },
+        {
+          id: "2",
+          name: "Analyzing requirements",
+          status: "completed",
+          icon: "sparkles",
+        },
+        {
+          id: "3",
+          name: "Generating epics",
+          status: "in-progress",
+          icon: "layers",
+        },
+        {
+          id: "4",
+          name: "Creating user stories",
+          status: "pending",
+          icon: "list",
+        },
+      ]);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    if (onTaskUpdate) {
+      onTaskUpdate([
+        {
+          id: "1",
+          name: "Uploading documents",
+          status: "completed",
+          icon: "file",
+        },
+        {
+          id: "2",
+          name: "Analyzing requirements",
+          status: "completed",
+          icon: "sparkles",
+        },
+        {
+          id: "3",
+          name: "Generating epics",
+          status: "completed",
+          icon: "layers",
+        },
+        {
+          id: "4",
+          name: "Creating user stories",
+          status: "completed",
+          icon: "list",
+        },
+      ]);
+    }
+
+    setIsProcessing(false);
+    setEpics(MOCK_EPICS);
+    setCurrentStage("epic-review");
+
+    addMessage(
+      "assistant",
+      `✅ Processing complete! I've generated ${MOCK_EPICS.length} epics from your requirements. Please review and approve, reject, or regenerate each epic:`,
+      "epic-review",
+      { epics: MOCK_EPICS },
+    );
+  };
+
+  const handleApproveEpic = (epicId: string) => {
+    setEpics(
+      epics.map((e) =>
+        e.id === epicId ? { ...e, status: "approved" as const } : e,
+      ),
+    );
+    addMessage(
+      "user",
+      `Approved epic: ${epics.find((e) => e.id === epicId)?.title}`,
+    );
+  };
+
+  const handleRejectEpic = (epicId: string) => {
+    setEpics(
+      epics.map((e) =>
+        e.id === epicId ? { ...e, status: "rejected" as const } : e,
+      ),
+    );
+    addMessage(
+      "user",
+      `Rejected epic: ${epics.find((e) => e.id === epicId)?.title}`,
+    );
+  };
+
+  const handleRegenerateEpic = async (epicId: string) => {
+    setRegeneratingEpicId(epicId);
+    addMessage(
+      "user",
+      `Regenerating epic: ${epics.find((e) => e.id === epicId)?.title}`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    setRegeneratingEpicId(null);
+    addMessage("assistant", "✅ Epic regenerated successfully!");
+  };
+
+  const handleContinueToStories = () => {
+    const approvedEpics = epics.filter((e) => e.status === "approved");
+    if (approvedEpics.length === 0) {
+      addMessage(
+        "assistant",
+        "⚠️ Please approve at least one epic before continuing.",
+      );
+      return;
+    }
+
+    setCurrentStage("story-review");
+    addMessage(
+      "user",
+      `Continue to story review (${approvedEpics.length} epics approved)`,
+    );
+    setTimeout(() => {
+      addMessage(
+        "assistant",
+        `Great! Now let's review the user stories for your approved epics. Please approve, reject, or regenerate each story:`,
+        "story-review",
+        { epics: approvedEpics },
+      );
+    }, 500);
+  };
+
+  const handleApproveStory = (epicId: string, storyId: string) => {
+    setEpics(
+      epics.map((epic) =>
+        epic.id === epicId
+          ? {
+              ...epic,
+              userStories: epic.userStories.map((story) =>
+                story.id === storyId
+                  ? { ...story, status: "approved" as const }
+                  : story,
+              ),
+            }
+          : epic,
+      ),
+    );
+    const story = epics
+      .find((e) => e.id === epicId)
+      ?.userStories.find((s) => s.id === storyId);
+    addMessage("user", `Approved story: ${story?.title}`);
+  };
+
+  const handleRejectStory = (epicId: string, storyId: string) => {
+    setEpics(
+      epics.map((epic) =>
+        epic.id === epicId
+          ? {
+              ...epic,
+              userStories: epic.userStories.map((story) =>
+                story.id === storyId
+                  ? { ...story, status: "rejected" as const }
+                  : story,
+              ),
+            }
+          : epic,
+      ),
+    );
+    const story = epics
+      .find((e) => e.id === epicId)
+      ?.userStories.find((s) => s.id === storyId);
+    addMessage("user", `Rejected story: ${story?.title}`);
+  };
+
+  const handleRegenerateStory = async (epicId: string, storyId: string) => {
+    setRegeneratingStoryId(storyId);
+    const story = epics
+      .find((e) => e.id === epicId)
+      ?.userStories.find((s) => s.id === storyId);
+    addMessage("user", `Regenerating story: ${story?.title}`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    setRegeneratingStoryId(null);
+    addMessage("assistant", "✅ Story regenerated successfully!");
+  };
+
+  const handleInitiateJiraSync = () => {
+    const approvedEpics = epics.filter((e) => e.status === "approved");
+    const approvedStories = approvedEpics.reduce(
+      (count, epic) =>
+        count + epic.userStories.filter((s) => s.status === "approved").length,
+      0,
+    );
+
+    if (approvedStories === 0) {
+      addMessage(
+        "assistant",
+        "⚠️ Please approve at least one user story before syncing to Jira.",
+      );
+      return;
+    }
+
+    setCurrentStage("jira-project-selection");
+    addMessage("user", "Sync to Jira");
+    addMessage(
+      "assistant",
+      "Great! Please select which Jira project you'd like to sync to:",
+      "jira-project-selection",
+    );
+  };
+
+  const handleJiraProjectSelect = (projectKey: string) => {
+    setSelectedJiraProject(projectKey);
+    const project = jiraProjects.find((p) => p.key === projectKey);
+    addMessage(
+      "user",
+      `Selected Jira project: ${project?.name} (${projectKey})`,
+    );
+
+    setTimeout(() => {
+      startJiraSync();
+    }, 500);
+  };
+
+  const startJiraSync = async () => {
+    const approvedEpics = epics.filter((e) => e.status === "approved");
+    const approvedStories = approvedEpics.reduce(
+      (count, epic) =>
+        count + epic.userStories.filter((s) => s.status === "approved").length,
+      0,
+    );
+
+    setCurrentStage("jira-sync");
+    addMessage("assistant", "🔄 Syncing to Jira...", "jira-sync");
+
+    if (onTaskUpdate) {
+      onTaskUpdate([
+        {
+          id: "1",
+          name: "Syncing epics to Jira",
+          status: "in-progress",
+          icon: "layers",
+        },
+        {
+          id: "2",
+          name: "Syncing user stories to Jira",
+          status: "pending",
+          icon: "list",
+        },
+        { id: "3", name: "Finalizing sync", status: "pending", icon: "check" },
+      ]);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    if (onTaskUpdate) {
+      onTaskUpdate([
+        {
+          id: "1",
+          name: "Syncing epics to Jira",
+          status: "completed",
+          icon: "layers",
+        },
+        {
+          id: "2",
+          name: "Syncing user stories to Jira",
+          status: "in-progress",
+          icon: "list",
+        },
+        { id: "3", name: "Finalizing sync", status: "pending", icon: "check" },
+      ]);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    if (onTaskUpdate) {
+      onTaskUpdate([
+        {
+          id: "1",
+          name: "Syncing epics to Jira",
+          status: "completed",
+          icon: "layers",
+        },
+        {
+          id: "2",
+          name: "Syncing user stories to Jira",
+          status: "completed",
+          icon: "list",
+        },
+        {
+          id: "3",
+          name: "Finalizing sync",
+          status: "completed",
+          icon: "check",
+        },
+      ]);
+    }
+
+    setCurrentStage("complete");
+    addMessage(
+      "assistant",
+      `✅ Sync complete! Successfully created ${approvedEpics.length} epics and ${approvedStories} user stories in Jira. Your requirements are ready for development!`,
+    );
+  };
+
+  const toggleEpic = (epicId: string) => {
+    setEpics(
+      epics.map((e) => (e.id === epicId ? { ...e, expanded: !e.expanded } : e)),
+    );
   };
 
   const handleSend = () => {
     if (!input.trim()) return;
 
     const userInput = input.trim();
-    addMessage("user", userInput);
+
+    // Handle description submission
     setInput("");
-
-    // AI response simulation based on conversation step
-    setTimeout(() => {
-      if (conversationStep === "name") {
-        setProjectName(userInput);
-        setConversationStep("stack");
-        addMessage(
-          "assistant",
-          `Perfect! "${userInput}" is a great name. Now, what technology stack would you like to use for this project?`,
-        );
-
-        // Update tasks: Start analyzing requirements
-        if (onTaskUpdate) {
-          onTaskUpdate([
-            {
-              id: "1",
-              name: "Analyzing project requirements",
-              status: "in-progress",
-              icon: "file",
-            },
-            {
-              id: "2",
-              name: "Setting up project structure",
-              status: "pending",
-              icon: "code",
-            },
-            {
-              id: "3",
-              name: "Configuring database schema",
-              status: "pending",
-              icon: "database",
-            },
-            {
-              id: "4",
-              name: "Creating CI/CD pipeline",
-              status: "pending",
-              icon: "git",
-            },
-            {
-              id: "5",
-              name: "Installing dependencies",
-              status: "pending",
-              icon: "package",
-            },
-            {
-              id: "6",
-              name: "Configuring environment",
-              status: "pending",
-              icon: "settings",
-            },
-          ]);
-
-          setTimeout(() => {
-            if (onTaskUpdate) {
-              onTaskUpdate([
-                {
-                  id: "1",
-                  name: "Analyzing project requirements",
-                  status: "completed",
-                  icon: "file",
-                },
-                {
-                  id: "2",
-                  name: "Setting up project structure",
-                  status: "pending",
-                  icon: "code",
-                },
-                {
-                  id: "3",
-                  name: "Configuring database schema",
-                  status: "pending",
-                  icon: "database",
-                },
-                {
-                  id: "4",
-                  name: "Creating CI/CD pipeline",
-                  status: "pending",
-                  icon: "git",
-                },
-                {
-                  id: "5",
-                  name: "Installing dependencies",
-                  status: "pending",
-                  icon: "package",
-                },
-                {
-                  id: "6",
-                  name: "Configuring environment",
-                  status: "pending",
-                  icon: "settings",
-                },
-              ]);
-            }
-          }, 1500);
-        }
-      } else if (conversationStep === "stack") {
-        setTechStack(userInput);
-        setConversationStep("features");
-        addMessage(
-          "assistant",
-          `Excellent choice! ${userInput} is a solid stack. What key features would you like to include in your project?`,
-        );
-
-        // Update tasks: Start setting up project structure
-        if (onTaskUpdate) {
-          onTaskUpdate([
-            {
-              id: "1",
-              name: "Analyzing project requirements",
-              status: "completed",
-              icon: "file",
-            },
-            {
-              id: "2",
-              name: "Setting up project structure",
-              status: "in-progress",
-              icon: "code",
-            },
-            {
-              id: "3",
-              name: "Configuring database schema",
-              status: "pending",
-              icon: "database",
-            },
-            {
-              id: "4",
-              name: "Creating CI/CD pipeline",
-              status: "pending",
-              icon: "git",
-            },
-            {
-              id: "5",
-              name: "Installing dependencies",
-              status: "pending",
-              icon: "package",
-            },
-            {
-              id: "6",
-              name: "Configuring environment",
-              status: "pending",
-              icon: "settings",
-            },
-          ]);
-
-          setTimeout(() => {
-            if (onTaskUpdate) {
-              onTaskUpdate([
-                {
-                  id: "1",
-                  name: "Analyzing project requirements",
-                  status: "completed",
-                  icon: "file",
-                },
-                {
-                  id: "2",
-                  name: "Setting up project structure",
-                  status: "completed",
-                  icon: "code",
-                },
-                {
-                  id: "3",
-                  name: "Configuring database schema",
-                  status: "pending",
-                  icon: "database",
-                },
-                {
-                  id: "4",
-                  name: "Creating CI/CD pipeline",
-                  status: "pending",
-                  icon: "git",
-                },
-                {
-                  id: "5",
-                  name: "Installing dependencies",
-                  status: "pending",
-                  icon: "package",
-                },
-                {
-                  id: "6",
-                  name: "Configuring environment",
-                  status: "pending",
-                  icon: "settings",
-                },
-              ]);
-            }
-          }, 1500);
-        }
-      } else if (conversationStep === "features") {
-        setConversationStep("complete");
-        setSuggestions([]);
-        addMessage(
-          "assistant",
-          `Great! I'm now setting up your project with ${userInput}. I'll start by creating the project structure, configuring your environment, and setting up the initial codebase. You can track my progress in the AI Progress panel on the right.`,
-        );
-
-        // Update tasks: Start configuring database
-        if (onTaskUpdate) {
-          onTaskUpdate([
-            {
-              id: "1",
-              name: "Analyzing project requirements",
-              status: "completed",
-              icon: "file",
-            },
-            {
-              id: "2",
-              name: "Setting up project structure",
-              status: "completed",
-              icon: "code",
-            },
-            {
-              id: "3",
-              name: "Configuring database schema",
-              status: "in-progress",
-              icon: "database",
-            },
-            {
-              id: "4",
-              name: "Creating CI/CD pipeline",
-              status: "pending",
-              icon: "git",
-            },
-            {
-              id: "5",
-              name: "Installing dependencies",
-              status: "pending",
-              icon: "package",
-            },
-            {
-              id: "6",
-              name: "Configuring environment",
-              status: "pending",
-              icon: "settings",
-            },
-          ]);
-
-          setTimeout(() => {
-            if (onTaskUpdate) {
-              onTaskUpdate([
-                {
-                  id: "1",
-                  name: "Analyzing project requirements",
-                  status: "completed",
-                  icon: "file",
-                },
-                {
-                  id: "2",
-                  name: "Setting up project structure",
-                  status: "completed",
-                  icon: "code",
-                },
-                {
-                  id: "3",
-                  name: "Configuring database schema",
-                  status: "completed",
-                  icon: "database",
-                },
-                {
-                  id: "4",
-                  name: "Creating CI/CD pipeline",
-                  status: "in-progress",
-                  icon: "git",
-                },
-                {
-                  id: "5",
-                  name: "Installing dependencies",
-                  status: "pending",
-                  icon: "package",
-                },
-                {
-                  id: "6",
-                  name: "Configuring environment",
-                  status: "pending",
-                  icon: "settings",
-                },
-              ]);
-            }
-          }, 1000);
-
-          setTimeout(() => {
-            if (onTaskUpdate) {
-              onTaskUpdate([
-                {
-                  id: "1",
-                  name: "Analyzing project requirements",
-                  status: "completed",
-                  icon: "file",
-                },
-                {
-                  id: "2",
-                  name: "Setting up project structure",
-                  status: "completed",
-                  icon: "code",
-                },
-                {
-                  id: "3",
-                  name: "Configuring database schema",
-                  status: "completed",
-                  icon: "database",
-                },
-                {
-                  id: "4",
-                  name: "Creating CI/CD pipeline",
-                  status: "completed",
-                  icon: "git",
-                },
-                {
-                  id: "5",
-                  name: "Installing dependencies",
-                  status: "in-progress",
-                  icon: "package",
-                },
-                {
-                  id: "6",
-                  name: "Configuring environment",
-                  status: "pending",
-                  icon: "settings",
-                },
-              ]);
-            }
-          }, 1800);
-
-          setTimeout(() => {
-            if (onTaskUpdate) {
-              onTaskUpdate([
-                {
-                  id: "1",
-                  name: "Analyzing project requirements",
-                  status: "completed",
-                  icon: "file",
-                },
-                {
-                  id: "2",
-                  name: "Setting up project structure",
-                  status: "completed",
-                  icon: "code",
-                },
-                {
-                  id: "3",
-                  name: "Configuring database schema",
-                  status: "completed",
-                  icon: "database",
-                },
-                {
-                  id: "4",
-                  name: "Creating CI/CD pipeline",
-                  status: "completed",
-                  icon: "git",
-                },
-                {
-                  id: "5",
-                  name: "Installing dependencies",
-                  status: "completed",
-                  icon: "package",
-                },
-                {
-                  id: "6",
-                  name: "Configuring environment",
-                  status: "in-progress",
-                  icon: "settings",
-                },
-              ]);
-            }
-          }, 2500);
-
-          setTimeout(() => {
-            if (onTaskUpdate) {
-              onTaskUpdate([
-                {
-                  id: "1",
-                  name: "Analyzing project requirements",
-                  status: "completed",
-                  icon: "file",
-                },
-                {
-                  id: "2",
-                  name: "Setting up project structure",
-                  status: "completed",
-                  icon: "code",
-                },
-                {
-                  id: "3",
-                  name: "Configuring database schema",
-                  status: "completed",
-                  icon: "database",
-                },
-                {
-                  id: "4",
-                  name: "Creating CI/CD pipeline",
-                  status: "completed",
-                  icon: "git",
-                },
-                {
-                  id: "5",
-                  name: "Installing dependencies",
-                  status: "completed",
-                  icon: "package",
-                },
-                {
-                  id: "6",
-                  name: "Configuring environment",
-                  status: "completed",
-                  icon: "settings",
-                },
-              ]);
-            }
-
-            const successMessage = `✅ Project setup complete! Your project "${projectName}" is ready with ${userInput}. I've added it to your projects list. You can now start working on it or explore other projects.`;
-
-            addMessage("assistant", successMessage);
-
-            // Create and save the new project
-            if (onProjectComplete) {
-              const newProject = {
-                id: `project-${Date.now()}`,
-                name: projectName,
-                type: projectType || "greenfield",
-                lastActive: "Just now",
-                status: "active" as const,
-                confidence: 92,
-              };
-              onProjectComplete(newProject);
-            }
-          }, 3200);
-        }
-      } else {
-        addMessage(
-          "assistant",
-          "Thanks for that information! Let me help you further. What else would you like to configure?",
-        );
-      }
-    }, 800);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInput(suggestion);
+    handleDescriptionSubmit(userInput);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -587,40 +700,6 @@ export function ProjectSetupChat({
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const handleConnectJira = () => {
-    setJiraConnected(true);
-    addMessage(
-      "assistant",
-      "✅ Successfully connected to Jira! I can now import your existing issues, sprints, and project structure. Would you like me to analyze your current workflow?",
-    );
-
-    setTimeout(() => {
-      setConversationStep("name");
-      setSuggestions([
-        "Yes, analyze my workflow",
-        "No, let me configure manually",
-        "Import all issues and sprints",
-      ]);
-    }, 1000);
-  };
-
-  const handleConnectADA = () => {
-    setAdaConnected(true);
-    addMessage(
-      "assistant",
-      "✅ Successfully connected to Azure DevOps! I have access to your repositories, work items, and pipelines. Shall I start analyzing your project?",
-    );
-
-    setTimeout(() => {
-      setConversationStep("name");
-      setSuggestions([
-        "Yes, analyze everything",
-        "No, let me choose what to import",
-        "Import repositories only",
-      ]);
-    }, 1000);
   };
 
   return (
@@ -633,10 +712,10 @@ export function ProjectSetupChat({
           </div>
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Project Setup Assistant
+              AI Requirements Assistant
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-500">
-              Let's create your project together
+              Transform BRDs into user stories
             </p>
           </div>
         </div>
@@ -664,7 +743,7 @@ export function ProjectSetupChat({
 
               {/* Message Content */}
               <div
-                className={`flex-1 max-w-2xl ${message.role === "user" ? "items-end" : "items-start"} flex flex-col gap-1`}
+                className={`flex-1 max-w-3xl ${message.role === "user" ? "items-end" : "items-start"} flex flex-col gap-1`}
               >
                 <div
                   className={`rounded-2xl px-4 py-3 ${
@@ -685,117 +764,354 @@ export function ProjectSetupChat({
               </div>
             </div>
 
-            {/* Options Buttons */}
-            {message.options && message.role === "assistant" && (
-              <div className="flex gap-3 mt-4 ml-12">
-                {message.options.map((option) => (
+            {/* Project Type Selection */}
+            {message.type === "project-type" &&
+              message.role === "assistant" && (
+                <div className="flex gap-3 mt-4 ml-12">
                   <button
-                    key={option.value}
-                    onClick={() => handleOptionClick(option.value)}
-                    className="px-5 py-2.5 bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 hover:border-[#6366F1]/50 text-gray-900 dark:text-white rounded-xl transition-all hover:bg-[#6366F1]/10 text-sm font-medium"
+                    onClick={() => handleProjectTypeSelect("brownfield")}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 hover:border-[#F59E0B] text-gray-900 dark:text-white rounded-xl transition-all hover:bg-[#F59E0B]/10 text-sm font-medium"
                   >
-                    {option.label}
+                    <div className="w-5 h-5 bg-[#F59E0B]/20 rounded flex items-center justify-center">
+                      <span className="text-xs">🏗️</span>
+                    </div>
+                    Brownfield Project
                   </button>
-                ))}
-              </div>
-            )}
+                  <button
+                    onClick={() => handleProjectTypeSelect("greenfield")}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 hover:border-[#22C55E] text-gray-900 dark:text-white rounded-xl transition-all hover:bg-[#22C55E]/10 text-sm font-medium"
+                  >
+                    <div className="w-5 h-5 bg-[#22C55E]/20 rounded flex items-center justify-center">
+                      <span className="text-xs">✨</span>
+                    </div>
+                    Greenfield Project
+                  </button>
+                </div>
+              )}
 
-            {/* Integration Cards */}
-            {message.integration === "jira" && message.role === "assistant" && (
-              <div className="ml-12 mt-4 space-y-3">
-                <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-2xl p-5">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#0052CC] rounded-lg flex items-center justify-center">
-                        <svg
-                          className="w-6 h-6 text-white"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm4.5 15.5h-9v-7h9v7z" />
-                        </svg>
+            {/* File Upload */}
+            {message.type === "file-upload" &&
+              message.role === "assistant" &&
+              !uploadedDocument && (
+                <div className="mt-4 ml-12">
+                  <label className="block bg-white dark:bg-[#111827] border-2 border-dashed border-gray-300 dark:border-white/20 rounded-xl p-6 hover:border-[#6366F1] hover:bg-[#6366F1]/5 transition-all cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.txt,.doc"
+                      onChange={handleDocumentUpload}
+                      className="hidden"
+                    />
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] rounded-xl flex items-center justify-center">
+                        <Upload className="w-6 h-6 text-white" />
                       </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Jira Integration
-                        </h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          Import issues, sprints, and workflows
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          Upload BRD/PRD Document
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          PDF, DOCX, TXT (Max 10MB)
                         </p>
                       </div>
                     </div>
-                    {jiraConnected ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-[#22C55E]/10 border border-[#22C55E]/30 rounded-lg">
-                        <CheckCircle className="w-4 h-4 text-[#22C55E]" />
-                        <span className="text-xs font-semibold text-[#22C55E]">
-                          Connected
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleConnectJira}
-                        className="px-4 py-2 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-lg hover:from-[#5558E3] hover:to-[#7C4FE0] transition-all text-sm font-medium flex items-center gap-2"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Connect Jira
-                      </button>
-                    )}
-                  </div>
-                  {!jiraConnected && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
-                      Connect your Jira workspace to automatically import your
-                      project structure, backlog, and team workflows.
-                    </p>
-                  )}
+                  </label>
                 </div>
+              )}
 
-                <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-2xl p-5">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#0078D4] rounded-lg flex items-center justify-center">
-                        <svg
-                          className="w-6 h-6 text-white"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M0 12l3-3 3 3v6H0v-6zm9-9l3-3 3 3v15H9V3zm9 6l3-3 3 3v9h-6V9z" />
-                        </svg>
+            {/* Video Upload */}
+            {message.type === "video-upload" &&
+              message.role === "assistant" &&
+              !uploadedVideo && (
+                <div className="mt-4 ml-12 space-y-3">
+                  <label className="block bg-white dark:bg-[#111827] border-2 border-dashed border-gray-300 dark:border-white/20 rounded-xl p-6 hover:border-[#8B5CF6] hover:bg-[#8B5CF6]/5 transition-all cursor-pointer">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoUpload}
+                      className="hidden"
+                    />
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 bg-[#8B5CF6]/10 rounded-xl flex items-center justify-center">
+                        <Video className="w-6 h-6 text-[#8B5CF6]" />
                       </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Azure DevOps (ADA)
-                        </h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          Connect repos, boards, and pipelines
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          Upload Video (Optional)
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          MP4, MOV, AVI (Max 100MB)
                         </p>
                       </div>
                     </div>
-                    {adaConnected ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-[#22C55E]/10 border border-[#22C55E]/30 rounded-lg">
-                        <CheckCircle className="w-4 h-4 text-[#22C55E]" />
-                        <span className="text-xs font-semibold text-[#22C55E]">
-                          Connected
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleConnectADA}
-                        className="px-4 py-2 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-lg hover:from-[#5558E3] hover:to-[#7C4FE0] transition-all text-sm font-medium flex items-center gap-2"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Connect Azure
-                      </button>
-                    )}
-                  </div>
-                  {!adaConnected && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
-                      Link your Azure DevOps organization to sync repositories,
-                      work items, and existing CI/CD pipelines.
-                    </p>
-                  )}
+                  </label>
+                  <button
+                    onClick={handleSkipVideo}
+                    className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all"
+                  >
+                    Skip video upload
+                  </button>
                 </div>
-              </div>
-            )}
+              )}
+
+            {/* Epic Review */}
+            {message.type === "epic-review" &&
+              message.role === "assistant" &&
+              message.data?.epics && (
+                <div className="mt-4 ml-12 space-y-3">
+                  {epics.map((epic) => (
+                    <div
+                      key={epic.id}
+                      className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden"
+                    >
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="font-semibold text-gray-900 dark:text-white">
+                                {epic.title}
+                              </h4>
+                              {epic.status === "approved" && (
+                                <span className="px-2 py-1 bg-[#22C55E]/10 text-[#22C55E] text-xs font-semibold rounded">
+                                  APPROVED
+                                </span>
+                              )}
+                              {epic.status === "rejected" && (
+                                <span className="px-2 py-1 bg-[#EF4444]/10 text-[#EF4444] text-xs font-semibold rounded">
+                                  REJECTED
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {epic.description}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                              {epic.userStories.length} user stories
+                            </p>
+                          </div>
+                        </div>
+                        {epic.status === "pending" && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleApproveEpic(epic.id)}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-[#22C55E]/10 hover:bg-[#22C55E]/20 border border-[#22C55E]/30 text-[#22C55E] rounded-lg transition-all text-xs"
+                            >
+                              <CheckCircle className="w-3 h-3" />
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectEpic(epic.id)}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 border border-[#EF4444]/30 text-[#EF4444] rounded-lg transition-all text-xs"
+                            >
+                              <XCircle className="w-3 h-3" />
+                              Reject
+                            </button>
+                            <button
+                              onClick={() => handleRegenerateEpic(epic.id)}
+                              disabled={regeneratingEpicId === epic.id}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/30 text-[#6366F1] rounded-lg transition-all text-xs disabled:opacity-50"
+                            >
+                              <RefreshCw
+                                className={`w-3 h-3 ${regeneratingEpicId === epic.id ? "animate-spin" : ""}`}
+                              />
+                              {regeneratingEpicId === epic.id
+                                ? "Regenerating..."
+                                : "Regenerate"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleContinueToStories}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-xl font-medium hover:from-[#5558E3] hover:to-[#7C4FE0] transition-all text-sm"
+                  >
+                    Continue to User Story Review (
+                    {epics.filter((e) => e.status === "approved").length} epics
+                    approved)
+                  </button>
+                </div>
+              )}
+
+            {/* Story Review */}
+            {message.type === "story-review" &&
+              message.role === "assistant" &&
+              message.data?.epics && (
+                <div className="mt-4 ml-12 space-y-4">
+                  {epics
+                    .filter((e) => e.status === "approved")
+                    .map((epic) => (
+                      <div
+                        key={epic.id}
+                        className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden"
+                      >
+                        <div className="p-4">
+                          <button
+                            onClick={() => toggleEpic(epic.id)}
+                            className="w-full flex items-center gap-2 mb-3"
+                          >
+                            {epic.expanded ? (
+                              <ChevronDown className="w-4 h-4 text-gray-400" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-gray-400" />
+                            )}
+                            <h4 className="font-semibold text-gray-900 dark:text-white">
+                              {epic.title}
+                            </h4>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              (
+                              {
+                                epic.userStories.filter(
+                                  (s) => s.status === "approved",
+                                ).length
+                              }
+                              /{epic.userStories.length} approved)
+                            </span>
+                          </button>
+
+                          {epic.expanded && (
+                            <div className="space-y-3">
+                              {epic.userStories.map((story) => (
+                                <div
+                                  key={story.id}
+                                  className="bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-white/10 rounded-lg p-3"
+                                >
+                                  <div className="mb-3">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h5 className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {story.title}
+                                      </h5>
+                                      {story.status === "approved" && (
+                                        <span className="px-2 py-0.5 bg-[#22C55E]/10 text-[#22C55E] text-xs font-semibold rounded">
+                                          APPROVED
+                                        </span>
+                                      )}
+                                      {story.status === "rejected" && (
+                                        <span className="px-2 py-0.5 bg-[#EF4444]/10 text-[#EF4444] text-xs font-semibold rounded">
+                                          REJECTED
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                      {story.description}
+                                    </p>
+
+                                    {/* Acceptance Criteria */}
+                                    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-white/10">
+                                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                        Acceptance Criteria:
+                                      </p>
+                                      <div className="space-y-1">
+                                        {story.acceptanceCriteria.map(
+                                          (criteria, index) => (
+                                            <div
+                                              key={index}
+                                              className="flex items-start gap-2"
+                                            >
+                                              <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                {index + 1}.
+                                              </span>
+                                              <p className="text-xs text-gray-700 dark:text-gray-300 flex-1">
+                                                {criteria}
+                                              </p>
+                                            </div>
+                                          ),
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {story.status === "pending" && (
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() =>
+                                          handleApproveStory(epic.id, story.id)
+                                        }
+                                        className="flex items-center gap-1 px-2 py-1 bg-[#22C55E]/10 hover:bg-[#22C55E]/20 border border-[#22C55E]/30 text-[#22C55E] rounded text-xs"
+                                      >
+                                        <CheckCircle className="w-3 h-3" />
+                                        Approve
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          handleRejectStory(epic.id, story.id)
+                                        }
+                                        className="flex items-center gap-1 px-2 py-1 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 border border-[#EF4444]/30 text-[#EF4444] rounded text-xs"
+                                      >
+                                        <XCircle className="w-3 h-3" />
+                                        Reject
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          handleRegenerateStory(
+                                            epic.id,
+                                            story.id,
+                                          )
+                                        }
+                                        disabled={
+                                          regeneratingStoryId === story.id
+                                        }
+                                        className="flex items-center gap-1 px-2 py-1 bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/30 text-[#6366F1] rounded text-xs disabled:opacity-50"
+                                      >
+                                        <RefreshCw
+                                          className={`w-3 h-3 ${regeneratingStoryId === story.id ? "animate-spin" : ""}`}
+                                        />
+                                        Regenerate
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  <button
+                    onClick={handleInitiateJiraSync}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-xl font-medium hover:from-[#5558E3] hover:to-[#7C4FE0] transition-all text-sm"
+                  >
+                    Sync to Jira
+                  </button>
+                </div>
+              )}
+
+            {/* Jira Project Selection */}
+            {message.type === "jira-project-selection" &&
+              message.role === "assistant" && (
+                <div className="mt-4 ml-12 space-y-3">
+                  {jiraProjects.map((project) => (
+                    <button
+                      key={project.key}
+                      onClick={() => handleJiraProjectSelect(project.key)}
+                      className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                        selectedJiraProject === project.key
+                          ? "border-[#6366F1] bg-[#6366F1]/5"
+                          : "border-gray-200 dark:border-white/10 hover:border-[#6366F1]/50 hover:bg-[#6366F1]/5"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="px-2 py-1 bg-[#6366F1]/10 text-[#6366F1] text-xs font-mono font-semibold rounded">
+                              {project.key}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {project.name}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {project.tickets} existing tickets
+                          </p>
+                        </div>
+                        {selectedJiraProject === project.key && (
+                          <CheckCircle className="w-5 h-5 text-[#6366F1]" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
           </div>
         ))}
         <div ref={messagesEndRef} />
@@ -803,36 +1119,20 @@ export function ProjectSetupChat({
 
       {/* Input Area */}
       <div className="border-t border-gray-200 dark:border-white/10 p-4 flex-shrink-0">
-        <div className="max-w-4xl mx-auto space-y-3">
-          {/* Suggestion Chips */}
-          {suggestions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="px-4 py-2 bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 hover:border-[#6366F1]/50 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all hover:bg-[#6366F1]/10 text-sm font-medium"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Input Box */}
+        <div className="max-w-4xl mx-auto">
           <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-2xl flex items-end gap-3 p-3 focus-within:border-[#6366F1]/50 transition-colors">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your response..."
+              placeholder="Type your message..."
               rows={1}
               className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm resize-none focus:outline-none min-h-[24px] max-h-32"
               style={{ lineHeight: "1.5" }}
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() && currentStage !== "upload"}
               className="p-2 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-lg hover:from-[#5558E3] hover:to-[#7C4FE0] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             >
               <Send className="w-5 h-5" />
