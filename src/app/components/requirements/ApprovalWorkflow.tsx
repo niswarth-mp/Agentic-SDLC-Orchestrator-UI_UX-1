@@ -12,12 +12,13 @@ import {
 
 interface UserStory {
   id: string;
+  epic_id: string;
   title: string;
   description: string;
-  priority: "low" | "medium" | "high" | "critical";
-  storyPoints: number;
-  acceptanceCriteria: string[];
-  status: "pending" | "approved" | "rejected";
+  priority: string;
+  story_points: number;
+  acceptance_criteria: string[];
+  status?: "pending" | "approved" | "rejected";
   expanded?: boolean;
   feedback?: string;
 }
@@ -43,7 +44,7 @@ export function ApprovalWorkflow({
 }: ApprovalWorkflowProps) {
   const [epics, setEpics] = useState(initialEpics);
   const [feedbackMode, setFeedbackMode] = useState<{
-    type: "epic" | "story";
+    type: "reject" | "regenerate";
     id: string;
     epicId?: string;
   } | null>(null);
@@ -85,41 +86,50 @@ export function ApprovalWorkflow({
     );
   };
 
-  const rejectWithFeedback = (
-    type: "epic" | "story",
-    id: string,
-    epicId?: string,
-  ) => {
-    setFeedbackMode({ type, id, epicId });
+  const openRejectModal = (id: string, epicId?: string) => {
+    setFeedbackMode({ type: "reject", id, epicId });
+  };
+
+  const openRegenerateModal = (id: string, epicId?: string) => {
+    setFeedbackMode({ type: "regenerate", id, epicId });
   };
 
   const regenerateStory = async (epicId: string, storyId: string) => {
+    if (!feedbackText.trim()) return;
     setRegeneratingStoryId(storyId);
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setRegeneratingStoryId(null);
+    setFeedbackMode(null);
+    setFeedbackText("");
   };
 
   const submitFeedback = () => {
     if (!feedbackMode || !feedbackText.trim()) return;
 
-    setEpics(
-      epics.map((epic) =>
-        epic.id === feedbackMode.epicId
-          ? {
-              ...epic,
-              userStories: epic.userStories.map((story) =>
-                story.id === feedbackMode.id
-                  ? {
-                      ...story,
-                      status: "rejected" as const,
-                      feedback: feedbackText,
-                    }
-                  : story,
-              ),
-            }
-          : epic,
-      ),
-    );
+    if (feedbackMode.type === "reject") {
+      setEpics(
+        epics.map((epic) =>
+          epic.id === feedbackMode.epicId
+            ? {
+                ...epic,
+                userStories: epic.userStories.map((story) =>
+                  story.id === feedbackMode.id
+                    ? {
+                        ...story,
+                        status: "rejected" as const,
+                        feedback: feedbackText,
+                      }
+                    : story,
+                ),
+              }
+            : epic,
+        ),
+      );
+    } else {
+      // Regenerate
+      regenerateStory(feedbackMode.epicId!, feedbackMode.id);
+      return;
+    }
 
     setFeedbackMode(null);
     setFeedbackText("");
@@ -344,11 +354,7 @@ export function ApprovalWorkflow({
                                 </button>
                                 <button
                                   onClick={() =>
-                                    rejectWithFeedback(
-                                      "story",
-                                      story.id,
-                                      epic.id,
-                                    )
+                                    openRejectModal(story.id, epic.id)
                                   }
                                   className="flex items-center gap-2 px-3 py-2 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 border border-[#EF4444]/30 text-[#EF4444] rounded-lg transition-all text-xs"
                                   title="Reject"
@@ -358,7 +364,7 @@ export function ApprovalWorkflow({
                                 </button>
                                 <button
                                   onClick={() =>
-                                    regenerateStory(epic.id, story.id)
+                                    openRegenerateModal(story.id, epic.id)
                                   }
                                   disabled={regeneratingStoryId === story.id}
                                   className="flex items-center gap-2 px-3 py-2 bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/30 text-[#6366F1] rounded-lg transition-all text-xs disabled:opacity-50"
@@ -381,7 +387,7 @@ export function ApprovalWorkflow({
                               Acceptance Criteria
                             </h5>
                             <div className="space-y-2">
-                              {story.acceptanceCriteria.map(
+                              {story.acceptance_criteria.map(
                                 (criteria, index) => (
                                   <div
                                     key={index}
@@ -416,11 +422,14 @@ export function ApprovalWorkflow({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-2xl max-w-2xl w-full p-6">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              Provide Rejection Feedback
+              {feedbackMode.type === "reject"
+                ? "Provide Rejection Feedback"
+                : "Provide Regenerate Feedback"}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Please explain why you're rejecting this user story and what
-              changes are needed for AI regeneration.
+              {feedbackMode.type === "reject"
+                ? "Please explain why you're rejecting this user story and what changes are needed for AI regeneration."
+                : "Please explain why you're regenerating this user story and what changes are needed for AI regeneration."}
             </p>
             <textarea
               value={feedbackText}
@@ -441,7 +450,11 @@ export function ApprovalWorkflow({
               <button
                 onClick={submitFeedback}
                 disabled={!feedbackText.trim()}
-                className="px-6 py-2 bg-gradient-to-r from-[#EF4444] to-[#DC2626] text-white rounded-lg hover:from-[#DC2626] hover:to-[#B91C1C] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`px-6 py-2 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  feedbackMode.type === "reject"
+                    ? "bg-gradient-to-r from-[#EF4444] to-[#DC2626] hover:from-[#DC2626] hover:to-[#B91C1C]"
+                    : "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5558E3] hover:to-[#7C4FE0]"
+                }`}
               >
                 Submit Feedback
               </button>

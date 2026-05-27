@@ -20,12 +20,13 @@ interface BRDDocument {
 
 interface UserStory {
   id: string;
+  epic_id: string;
   title: string;
   description: string;
-  priority: "low" | "medium" | "high" | "critical";
-  storyPoints: number;
-  acceptanceCriteria: string[];
-  status: "pending" | "approved" | "rejected";
+  priority: string;
+  story_points: number;
+  acceptance_criteria: string[];
+  status?: "pending" | "approved" | "rejected";
   expanded?: boolean;
 }
 
@@ -43,115 +44,103 @@ interface AIGenerationProps {
   onComplete: (epics: Epic[]) => void;
 }
 
-const PRIORITY_COLORS = {
-  low: {
-    bg: "bg-gray-100 dark:bg-gray-800",
-    text: "text-gray-700 dark:text-gray-300",
-    dot: "bg-gray-500",
-  },
-  medium: {
-    bg: "bg-blue-100 dark:bg-blue-900/30",
-    text: "text-blue-700 dark:text-blue-300",
-    dot: "bg-blue-500",
-  },
-  high: {
-    bg: "bg-orange-100 dark:bg-orange-900/30",
-    text: "text-orange-700 dark:text-orange-300",
-    dot: "bg-orange-500",
-  },
-  critical: {
+const PRIORITY_COLORS: Record<
+  string,
+  { bg: string; text: string; dot: string }
+> = {
+  P0: {
     bg: "bg-red-100 dark:bg-red-900/30",
     text: "text-red-700 dark:text-red-300",
     dot: "bg-red-500",
   },
+  P1: {
+    bg: "bg-orange-100 dark:bg-orange-900/30",
+    text: "text-orange-700 dark:text-orange-300",
+    dot: "bg-orange-500",
+  },
+  P2: {
+    bg: "bg-blue-100 dark:bg-blue-900/30",
+    text: "text-blue-700 dark:text-blue-300",
+    dot: "bg-blue-500",
+  },
+  P3: {
+    bg: "bg-gray-100 dark:bg-gray-800",
+    text: "text-gray-700 dark:text-gray-300",
+    dot: "bg-gray-500",
+  },
 };
 
-const MOCK_EPICS: Epic[] = [
-  {
-    id: "1",
-    title: "User Authentication & Authorization",
+import userStoriesData from "../../../imports/pasted_text/user-stories.json";
+
+// Epic titles and descriptions based on epic_id
+const EPIC_METADATA: Record<string, { title: string; description: string }> = {
+  "EP-01": {
+    title: "Hybrid Search & Retrieval",
     description:
-      "Implement secure user authentication system with role-based access control",
+      "Implement hybrid BM25 + vector search with RRF fusion and shadow evaluation framework",
+  },
+  "EP-02": {
+    title: "Query Understanding",
+    description:
+      "Build query understanding pipeline with intent classification, attribute extraction, and typo tolerance",
+  },
+  "EP-03": {
+    title: "Personalized Ranking",
+    description:
+      "Implement personalized ranking with real-time features and experiment framework",
+  },
+  "EP-04": {
+    title: "Merchandising & Inventory",
+    description:
+      "Enable merchandising rules authoring and inventory-aware ranking",
+  },
+  "EP-05": {
+    title: "Multi-Modal Search",
+    description: "Support voice and image search with graceful degradation",
+  },
+  "EP-06": {
+    title: "International Localization",
+    description:
+      "Implement locale-specific analyzers and embedding models for global markets",
+  },
+  "EP-07": {
+    title: "Autocomplete & Suggestions",
+    description:
+      "Build type-ahead autocomplete with personalization and trending highlights",
+  },
+  "EP-08": {
+    title: "Indexing & Observability",
+    description:
+      "Implement streaming catalog ingestion, A/B variant indexing, and explainability APIs",
+  },
+  "EP-09": {
+    title: "Facets & Result Diversity",
+    description: "Enable dynamic facets and result diversity controls",
+  },
+};
+
+// Group user stories by epic_id
+function groupStoriesByEpic(stories: UserStory[]): Epic[] {
+  const epicMap = new Map<string, UserStory[]>();
+
+  stories.forEach((story) => {
+    if (!epicMap.has(story.epic_id)) {
+      epicMap.set(story.epic_id, []);
+    }
+    epicMap.get(story.epic_id)!.push({ ...story, status: "pending" });
+  });
+
+  return Array.from(epicMap.entries()).map(([epicId, userStories]) => ({
+    id: epicId,
+    title: EPIC_METADATA[epicId]?.title || `Epic ${epicId}`,
+    description: EPIC_METADATA[epicId]?.description || "Epic description",
     status: "pending",
     expanded: false,
-    userStories: [
-      {
-        id: "1-1",
-        title: "User Registration",
-        description:
-          "As a new user, I want to register an account so that I can access the platform",
-        priority: "high",
-        storyPoints: 5,
-        status: "pending",
-        expanded: false,
-        acceptanceCriteria: [
-          "User can register with email and password",
-          "Email verification is sent upon registration",
-          "Password must meet security requirements (8+ chars, special chars)",
-          "User receives welcome email after successful registration",
-        ],
-      },
-      {
-        id: "1-2",
-        title: "User Login",
-        description:
-          "As a registered user, I want to log in to my account so that I can access my data",
-        priority: "high",
-        storyPoints: 3,
-        status: "pending",
-        expanded: false,
-        acceptanceCriteria: [
-          "User can log in with email and password",
-          "Invalid credentials show appropriate error message",
-          "Session is created and maintained across browser tabs",
-          "Remember me option available for persistent login",
-        ],
-      },
-    ],
-  },
-  {
-    id: "2",
-    title: "Product Catalog Management",
-    description:
-      "Build comprehensive product catalog with search, filtering, and categorization",
-    status: "pending",
-    expanded: false,
-    userStories: [
-      {
-        id: "2-1",
-        title: "Product Listing",
-        description:
-          "As a user, I want to browse products so that I can find items to purchase",
-        priority: "high",
-        storyPoints: 8,
-        status: "pending",
-        expanded: false,
-        acceptanceCriteria: [
-          "Products displayed in grid/list view",
-          "Each product shows image, name, price, and rating",
-          "Pagination or infinite scroll implemented",
-          "Loading states for better UX",
-        ],
-      },
-      {
-        id: "2-2",
-        title: "Product Search",
-        description:
-          "As a user, I want to search for products by keywords so that I can quickly find what I need",
-        priority: "medium",
-        storyPoints: 5,
-        status: "pending",
-        expanded: false,
-        acceptanceCriteria: [
-          "Search bar accessible from all pages",
-          "Real-time search suggestions as user types",
-          "Search results sorted by relevance",
-          "Search history saved for logged-in users",
-        ],
-      },
-    ],
-  },
-];
+    userStories,
+  }));
+}
+
+const MOCK_EPICS: Epic[] = groupStoriesByEpic(userStoriesData as UserStory[]);
 
 export function AIGeneration({ document, onComplete }: AIGenerationProps) {
   const [isGenerating, setIsGenerating] = useState(true);
@@ -160,6 +149,11 @@ export function AIGeneration({ document, onComplete }: AIGenerationProps) {
   const [regeneratingEpicId, setRegeneratingEpicId] = useState<string | null>(
     null,
   );
+  const [feedbackMode, setFeedbackMode] = useState<{
+    type: "reject" | "regenerate";
+    epicId: string;
+  } | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
 
   useEffect(() => {
     // Simulate AI generation
@@ -202,9 +196,12 @@ export function AIGeneration({ document, onComplete }: AIGenerationProps) {
   };
 
   const handleRegenerateEpic = async (epicId: string) => {
+    if (!feedbackText.trim()) return;
     setRegeneratingEpicId(epicId);
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setRegeneratingEpicId(null);
+    setFeedbackMode(null);
+    setFeedbackText("");
   };
 
   const approveEpic = (epicId: string) => {
@@ -216,11 +213,32 @@ export function AIGeneration({ document, onComplete }: AIGenerationProps) {
   };
 
   const rejectEpic = (epicId: string) => {
+    if (!feedbackText.trim()) return;
     setEpics(
       epics.map((epic) =>
         epic.id === epicId ? { ...epic, status: "rejected" as const } : epic,
       ),
     );
+    setFeedbackMode(null);
+    setFeedbackText("");
+  };
+
+  const openRejectModal = (epicId: string) => {
+    setFeedbackMode({ type: "reject", epicId });
+  };
+
+  const openRegenerateModal = (epicId: string) => {
+    setFeedbackMode({ type: "regenerate", epicId });
+  };
+
+  const submitFeedback = () => {
+    if (!feedbackMode || !feedbackText.trim()) return;
+
+    if (feedbackMode.type === "reject") {
+      rejectEpic(feedbackMode.epicId);
+    } else {
+      handleRegenerateEpic(feedbackMode.epicId);
+    }
   };
 
   const handleContinue = () => {
@@ -364,14 +382,14 @@ export function AIGeneration({ document, onComplete }: AIGenerationProps) {
                           Approve
                         </button>
                         <button
-                          onClick={() => rejectEpic(epic.id)}
+                          onClick={() => openRejectModal(epic.id)}
                           className="flex items-center gap-2 px-4 py-2 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 border border-[#EF4444]/30 text-[#EF4444] rounded-lg transition-all"
                         >
                           <XCircle className="w-4 h-4" />
                           Reject
                         </button>
                         <button
-                          onClick={() => handleRegenerateEpic(epic.id)}
+                          onClick={() => openRegenerateModal(epic.id)}
                           disabled={regeneratingEpicId === epic.id}
                           className="flex items-center gap-2 px-4 py-2 bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/30 text-[#6366F1] rounded-lg transition-all disabled:opacity-50"
                         >
@@ -412,12 +430,12 @@ export function AIGeneration({ document, onComplete }: AIGenerationProps) {
                         </div>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`px-2 py-1 ${PRIORITY_COLORS[story.priority].bg} ${PRIORITY_COLORS[story.priority].text} text-xs font-semibold rounded`}
+                            className={`px-2 py-1 ${PRIORITY_COLORS[story.priority]?.bg || PRIORITY_COLORS.P3.bg} ${PRIORITY_COLORS[story.priority]?.text || PRIORITY_COLORS.P3.text} text-xs font-semibold rounded`}
                           >
-                            {story.priority.toUpperCase()}
+                            {story.priority}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {story.storyPoints} SP
+                            {story.story_points} SP
                           </span>
                         </div>
                       </div>
@@ -446,6 +464,52 @@ export function AIGeneration({ document, onComplete }: AIGenerationProps) {
           Continue to User Story Approval ({approvedCount} Epics)
         </button>
       </div>
+
+      {/* Feedback Modal */}
+      {feedbackMode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-2xl max-w-2xl w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              {feedbackMode.type === "reject"
+                ? "Provide Rejection Feedback"
+                : "Provide Regenerate Feedback"}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {feedbackMode.type === "reject"
+                ? "Please explain why you're rejecting this epic and what changes are needed for AI regeneration."
+                : "Please explain why you're regenerating this epic and what changes are needed for AI regeneration."}
+            </p>
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6366F1] resize-none"
+              placeholder="Enter your feedback here..."
+            />
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setFeedbackMode(null);
+                  setFeedbackText("");
+                }}
+                className="px-6 py-2 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitFeedback}
+                disabled={!feedbackText.trim()}
+                className={`px-6 py-2 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  feedbackMode.type === "reject"
+                    ? "bg-gradient-to-r from-[#EF4444] to-[#DC2626] hover:from-[#DC2626] hover:to-[#B91C1C]"
+                    : "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5558E3] hover:to-[#7C4FE0]"
+                }`}
+              >
+                Submit Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

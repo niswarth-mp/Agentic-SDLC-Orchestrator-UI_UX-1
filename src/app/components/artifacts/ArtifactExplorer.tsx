@@ -47,7 +47,7 @@ export function ArtifactExplorer({
       name: "Requirements",
       icon: FileText,
       color: "text-[#6366F1]",
-      expanded: true,
+      expanded: false,
       files: [
         {
           name: "PRD.md",
@@ -77,7 +77,7 @@ export function ArtifactExplorer({
       name: "Development",
       icon: FileCode,
       color: "text-[#22C55E]",
-      expanded: true,
+      expanded: false,
       files: [
         {
           name: "PaymentService.java",

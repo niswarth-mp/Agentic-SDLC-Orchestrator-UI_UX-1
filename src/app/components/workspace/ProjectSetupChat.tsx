@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import userStoriesData from "../../../imports/pasted_text/user-stories.json";
 
 interface Message {
   id: string;
@@ -44,12 +45,13 @@ interface Epic {
 
 interface UserStory {
   id: string;
+  epic_id: string;
   title: string;
   description: string;
-  priority: "low" | "medium" | "high" | "critical";
-  storyPoints: number;
-  acceptanceCriteria: string[];
-  status: "pending" | "approved" | "rejected";
+  priority: string;
+  story_points: number;
+  acceptance_criteria: string[];
+  status?: "pending" | "approved" | "rejected";
   feedback?: string;
 }
 
@@ -59,96 +61,101 @@ interface ProjectSetupChatProps {
   onProjectComplete?: (project: any) => void;
 }
 
-const PRIORITY_COLORS = {
-  low: {
-    bg: "bg-gray-100 dark:bg-gray-800",
-    text: "text-gray-700 dark:text-gray-300",
-    dot: "bg-gray-500",
-  },
-  medium: {
-    bg: "bg-blue-100 dark:bg-blue-900/30",
-    text: "text-blue-700 dark:text-blue-300",
-    dot: "bg-blue-500",
-  },
-  high: {
-    bg: "bg-orange-100 dark:bg-orange-900/30",
-    text: "text-orange-700 dark:text-orange-300",
-    dot: "bg-orange-500",
-  },
-  critical: {
+const PRIORITY_COLORS: Record<
+  string,
+  { bg: string; text: string; dot: string }
+> = {
+  P0: {
     bg: "bg-red-100 dark:bg-red-900/30",
     text: "text-red-700 dark:text-red-300",
     dot: "bg-red-500",
   },
+  P1: {
+    bg: "bg-orange-100 dark:bg-orange-900/30",
+    text: "text-orange-700 dark:text-orange-300",
+    dot: "bg-orange-500",
+  },
+  P2: {
+    bg: "bg-blue-100 dark:bg-blue-900/30",
+    text: "text-blue-700 dark:text-blue-300",
+    dot: "bg-blue-500",
+  },
+  P3: {
+    bg: "bg-gray-100 dark:bg-gray-800",
+    text: "text-gray-700 dark:text-gray-300",
+    dot: "bg-gray-500",
+  },
 };
 
-const MOCK_EPICS: Epic[] = [
-  {
-    id: "1",
-    title: "User Authentication & Authorization",
+// Epic titles and descriptions based on epic_id
+const EPIC_METADATA: Record<string, { title: string; description: string }> = {
+  "EP-01": {
+    title: "Hybrid Search & Retrieval",
     description:
-      "Implement secure user authentication system with role-based access control",
+      "Implement hybrid BM25 + vector search with RRF fusion and shadow evaluation framework",
+  },
+  "EP-02": {
+    title: "Query Understanding",
+    description:
+      "Build query understanding pipeline with intent classification, attribute extraction, and typo tolerance",
+  },
+  "EP-03": {
+    title: "Personalized Ranking",
+    description:
+      "Implement personalized ranking with real-time features and experiment framework",
+  },
+  "EP-04": {
+    title: "Merchandising & Inventory",
+    description:
+      "Enable merchandising rules authoring and inventory-aware ranking",
+  },
+  "EP-05": {
+    title: "Multi-Modal Search",
+    description: "Support voice and image search with graceful degradation",
+  },
+  "EP-06": {
+    title: "International Localization",
+    description:
+      "Implement locale-specific analyzers and embedding models for global markets",
+  },
+  "EP-07": {
+    title: "Autocomplete & Suggestions",
+    description:
+      "Build type-ahead autocomplete with personalization and trending highlights",
+  },
+  "EP-08": {
+    title: "Indexing & Observability",
+    description:
+      "Implement streaming catalog ingestion, A/B variant indexing, and explainability APIs",
+  },
+  "EP-09": {
+    title: "Facets & Result Diversity",
+    description: "Enable dynamic facets and result diversity controls",
+  },
+};
+
+// Group user stories by epic_id
+function groupStoriesByEpic(stories: UserStory[]): Epic[] {
+  const epicMap = new Map<string, UserStory[]>();
+
+  stories.forEach((story) => {
+    if (!epicMap.has(story.epic_id)) {
+      epicMap.set(story.epic_id, []);
+    }
+    epicMap.get(story.epic_id)!.push({ ...story, status: "pending" });
+  });
+
+  return Array.from(epicMap.entries()).map(([epicId, userStories]) => ({
+    id: epicId,
+    title: EPIC_METADATA[epicId]?.title || `Epic ${epicId}`,
+    description: EPIC_METADATA[epicId]?.description || "Epic description",
     status: "pending",
     expanded: false,
-    userStories: [
-      {
-        id: "1-1",
-        title: "User Registration",
-        description:
-          "As a new user, I want to register an account so that I can access the platform",
-        priority: "high",
-        storyPoints: 5,
-        status: "pending",
-        acceptanceCriteria: [
-          "User can register with email and password",
-          "Email verification is sent upon registration",
-          "Password must meet security requirements (8+ chars, special chars)",
-          "User receives welcome email after successful registration",
-        ],
-      },
-      {
-        id: "1-2",
-        title: "User Login",
-        description:
-          "As a registered user, I want to log in to my account so that I can access my data",
-        priority: "high",
-        storyPoints: 3,
-        status: "pending",
-        acceptanceCriteria: [
-          "User can log in with email and password",
-          "Invalid credentials show appropriate error message",
-          "Session is created and maintained across browser tabs",
-          "Remember me option available for persistent login",
-        ],
-      },
-    ],
-  },
-  {
-    id: "2",
-    title: "Product Catalog Management",
-    description:
-      "Build comprehensive product catalog with search, filtering, and categorization",
-    status: "pending",
-    expanded: false,
-    userStories: [
-      {
-        id: "2-1",
-        title: "Product Listing",
-        description:
-          "As a user, I want to browse products so that I can find items to purchase",
-        priority: "high",
-        storyPoints: 8,
-        status: "pending",
-        acceptanceCriteria: [
-          "Products displayed in grid/list view",
-          "Each product shows image, name, price, and rating",
-          "Pagination or infinite scroll implemented",
-          "Loading states for better UX",
-        ],
-      },
-    ],
-  },
-];
+    userStories,
+  }));
+}
+
+const MOCK_EPICS: Epic[] = groupStoriesByEpic(userStoriesData as UserStory[]);
 
 export function ProjectSetupChat({
   onClose,
@@ -186,6 +193,13 @@ export function ProjectSetupChat({
   const [selectedJiraProject, setSelectedJiraProject] = useState<string | null>(
     null,
   );
+  const [feedbackMode, setFeedbackMode] = useState<{
+    type: "reject" | "regenerate";
+    itemType: "epic" | "story";
+    id: string;
+    epicId?: string;
+  } | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
   const [currentStage, setCurrentStage] = useState<
     | "project-type"
     | "upload"
@@ -459,7 +473,16 @@ export function ProjectSetupChat({
     );
   };
 
+  const openRejectEpicModal = (epicId: string) => {
+    setFeedbackMode({ type: "reject", itemType: "epic", id: epicId });
+  };
+
+  const openRegenerateEpicModal = (epicId: string) => {
+    setFeedbackMode({ type: "regenerate", itemType: "epic", id: epicId });
+  };
+
   const handleRejectEpic = (epicId: string) => {
+    if (!feedbackText.trim()) return;
     setEpics(
       epics.map((e) =>
         e.id === epicId ? { ...e, status: "rejected" as const } : e,
@@ -469,9 +492,12 @@ export function ProjectSetupChat({
       "user",
       `Rejected epic: ${epics.find((e) => e.id === epicId)?.title}`,
     );
+    setFeedbackMode(null);
+    setFeedbackText("");
   };
 
   const handleRegenerateEpic = async (epicId: string) => {
+    if (!feedbackText.trim()) return;
     setRegeneratingEpicId(epicId);
     addMessage(
       "user",
@@ -480,6 +506,8 @@ export function ProjectSetupChat({
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setRegeneratingEpicId(null);
     addMessage("assistant", "✅ Epic regenerated successfully!");
+    setFeedbackMode(null);
+    setFeedbackText("");
   };
 
   const handleContinueToStories = () => {
@@ -528,7 +556,21 @@ export function ProjectSetupChat({
     addMessage("user", `Approved story: ${story?.title}`);
   };
 
+  const openRejectStoryModal = (epicId: string, storyId: string) => {
+    setFeedbackMode({ type: "reject", itemType: "story", id: storyId, epicId });
+  };
+
+  const openRegenerateStoryModal = (epicId: string, storyId: string) => {
+    setFeedbackMode({
+      type: "regenerate",
+      itemType: "story",
+      id: storyId,
+      epicId,
+    });
+  };
+
   const handleRejectStory = (epicId: string, storyId: string) => {
+    if (!feedbackText.trim()) return;
     setEpics(
       epics.map((epic) =>
         epic.id === epicId
@@ -547,9 +589,12 @@ export function ProjectSetupChat({
       .find((e) => e.id === epicId)
       ?.userStories.find((s) => s.id === storyId);
     addMessage("user", `Rejected story: ${story?.title}`);
+    setFeedbackMode(null);
+    setFeedbackText("");
   };
 
   const handleRegenerateStory = async (epicId: string, storyId: string) => {
+    if (!feedbackText.trim()) return;
     setRegeneratingStoryId(storyId);
     const story = epics
       .find((e) => e.id === epicId)
@@ -558,6 +603,26 @@ export function ProjectSetupChat({
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setRegeneratingStoryId(null);
     addMessage("assistant", "✅ Story regenerated successfully!");
+    setFeedbackMode(null);
+    setFeedbackText("");
+  };
+
+  const submitFeedback = () => {
+    if (!feedbackMode || !feedbackText.trim()) return;
+
+    if (feedbackMode.itemType === "epic") {
+      if (feedbackMode.type === "reject") {
+        handleRejectEpic(feedbackMode.id);
+      } else {
+        handleRegenerateEpic(feedbackMode.id);
+      }
+    } else {
+      if (feedbackMode.type === "reject") {
+        handleRejectStory(feedbackMode.epicId!, feedbackMode.id);
+      } else {
+        handleRegenerateStory(feedbackMode.epicId!, feedbackMode.id);
+      }
+    }
   };
 
   const handleInitiateJiraSync = () => {
@@ -899,14 +964,14 @@ export function ProjectSetupChat({
                               Approve
                             </button>
                             <button
-                              onClick={() => handleRejectEpic(epic.id)}
+                              onClick={() => openRejectEpicModal(epic.id)}
                               className="flex items-center gap-1 px-3 py-1.5 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 border border-[#EF4444]/30 text-[#EF4444] rounded-lg transition-all text-xs"
                             >
                               <XCircle className="w-3 h-3" />
                               Reject
                             </button>
                             <button
-                              onClick={() => handleRegenerateEpic(epic.id)}
+                              onClick={() => openRegenerateEpicModal(epic.id)}
                               disabled={regeneratingEpicId === epic.id}
                               className="flex items-center gap-1 px-3 py-1.5 bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/30 text-[#6366F1] rounded-lg transition-all text-xs disabled:opacity-50"
                             >
@@ -1002,7 +1067,7 @@ export function ProjectSetupChat({
                                         Acceptance Criteria:
                                       </p>
                                       <div className="space-y-1">
-                                        {story.acceptanceCriteria.map(
+                                        {story.acceptance_criteria.map(
                                           (criteria, index) => (
                                             <div
                                               key={index}
@@ -1034,7 +1099,10 @@ export function ProjectSetupChat({
                                       </button>
                                       <button
                                         onClick={() =>
-                                          handleRejectStory(epic.id, story.id)
+                                          openRejectStoryModal(
+                                            epic.id,
+                                            story.id,
+                                          )
                                         }
                                         className="flex items-center gap-1 px-2 py-1 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 border border-[#EF4444]/30 text-[#EF4444] rounded text-xs"
                                       >
@@ -1043,7 +1111,7 @@ export function ProjectSetupChat({
                                       </button>
                                       <button
                                         onClick={() =>
-                                          handleRegenerateStory(
+                                          openRegenerateStoryModal(
                                             epic.id,
                                             story.id,
                                           )
@@ -1140,6 +1208,52 @@ export function ProjectSetupChat({
           </div>
         </div>
       </div>
+
+      {/* Feedback Modal */}
+      {feedbackMode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-2xl max-w-2xl w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              {feedbackMode.type === "reject"
+                ? "Provide Rejection Feedback"
+                : "Provide Regenerate Feedback"}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {feedbackMode.type === "reject"
+                ? `Please explain why you're rejecting this ${feedbackMode.itemType} and what changes are needed for AI regeneration.`
+                : `Please explain why you're regenerating this ${feedbackMode.itemType} and what changes are needed for AI regeneration.`}
+            </p>
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              className="w-full h-32 px-4 py-3 bg-gray-50 dark:bg-[#0F172A] border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#6366F1] resize-none"
+              placeholder="Enter your feedback here..."
+            />
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setFeedbackMode(null);
+                  setFeedbackText("");
+                }}
+                className="px-6 py-2 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitFeedback}
+                disabled={!feedbackText.trim()}
+                className={`px-6 py-2 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  feedbackMode.type === "reject"
+                    ? "bg-gradient-to-r from-[#EF4444] to-[#DC2626] hover:from-[#DC2626] hover:to-[#B91C1C]"
+                    : "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5558E3] hover:to-[#7C4FE0]"
+                }`}
+              >
+                Submit Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

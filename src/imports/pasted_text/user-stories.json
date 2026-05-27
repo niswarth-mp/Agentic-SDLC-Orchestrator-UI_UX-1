@@ -1,0 +1,499 @@
+[
+  {
+    "id": "US-01",
+    "epic_id": "EP-01",
+    "title": "Hybrid BM25 + Vector Retrieval",
+    "description": "As a shopper, I want search results that combine keyword precision with semantic understanding, so that I find relevant products even when my query words do not exactly match product titles",
+    "acceptance_criteria": [
+      "POST /api/v1/search returns results combining BM25 and vector retrieval scores",
+      "RRF fusion is applied by default with configurable weights per locale",
+      "Offline NDCG@10 improves by at least 15% vs BM25-only baseline in shadow eval",
+      "Blend weights are configurable via environment variables without redeployment",
+      "Response includes hybrid_score field per result for debugging"
+    ],
+    "priority": "P0",
+    "story_points": 13
+  },
+  {
+    "id": "US-02",
+    "epic_id": "EP-01",
+    "title": "Product Embedding Generation",
+    "description": "As a platform engineer, I want product embeddings generated from title, description, and attributes, so that semantic similarity can be computed at query time",
+    "acceptance_criteria": [
+      "embedding-service exposes POST /internal/v1/embed/product accepting product_id and text fields",
+      "Embeddings are 768-dimensional dense vectors stored in vector store",
+      "Batch embedding job processes 500k SKUs in under 4 hours",
+      "Incremental embedding triggered within 60s of catalog event",
+      "Embedding model version is stored alongside each vector for rollback support"
+    ],
+    "priority": "P0",
+    "story_points": 8
+  },
+  {
+    "id": "US-03",
+    "epic_id": "EP-01",
+    "title": "Query Embedding at Search Time",
+    "description": "As a shopper, I want my search query converted to a vector in real time, so that semantically similar products are retrieved even without keyword overlap",
+    "acceptance_criteria": [
+      "Query embedding latency p95 <20ms measured at embedding-service",
+      "Query vector is generated using the same model version as product vectors",
+      "Model version mismatch triggers fallback to BM25-only with alert",
+      "Query embedding is cached in Redis with 5-minute TTL for repeated queries",
+      "Cache hit rate reported in daily relevance dashboard"
+    ],
+    "priority": "P0",
+    "story_points": 5
+  },
+  {
+    "id": "US-04",
+    "epic_id": "EP-01",
+    "title": "Search Service Orchestration Layer",
+    "description": "As a platform engineer, I want a search-service that orchestrates query understanding, retrieval, ranking, and merchandising in a single request path, so that all components are coordinated with consistent latency budgets",
+    "acceptance_criteria": [
+      "search-service is deployed as a Spring Boot 3.2.1 service on EKS",
+      "POST /api/v1/search accepts SearchRequest and returns SearchResponse within 200ms p95",
+      "X-Request-ID correlation header is propagated to all downstream calls",
+      "Circuit breakers are configured for embedding-service, ranking-model-service, and vector store",
+      "Graceful degradation to BM25-only when vector store is unavailable"
+    ],
+    "priority": "P0",
+    "story_points": 13
+  },
+  {
+    "id": "US-05",
+    "epic_id": "EP-01",
+    "title": "Shadow Evaluation Framework",
+    "description": "As an ML engineer, I want to run new retrieval models in shadow mode against live traffic, so that I can validate offline metric improvements before production cutover",
+    "acceptance_criteria": [
+      "Shadow eval captures top-20 results from both old and new pipelines for 10% of queries",
+      "Results are written to S3 with query_id, pipeline_version, and result_set",
+      "Automated NDCG@10 and MRR comparison report generated daily",
+      "Shadow eval adds <5ms overhead to live query path",
+      "Promotion to production requires NDCG@10 improvement and zero regression on zero-result rate"
+    ],
+    "priority": "P0",
+    "story_points": 8
+  },
+  {
+    "id": "US-06",
+    "epic_id": "EP-02",
+    "title": "Intent Classification",
+    "description": "As a shopper, I want the search system to understand whether I am browsing, ready to buy, comparing options, or seeking support, so that results are ranked appropriately for my intent",
+    "acceptance_criteria": [
+      "query-understanding-service classifies intent as browse, transactional, comparison, or support",
+      "Intent classification p95 latency <15ms",
+      "Intent label is included in QueryLog and SearchResponse metadata",
+      "Transactional intent boosts in-stock and high-conversion products",
+      "Classification accuracy >85% on held-out labeled query set"
+    ],
+    "priority": "P0",
+    "story_points": 8
+  },
+  {
+    "id": "US-07",
+    "epic_id": "EP-02",
+    "title": "Attribute Extraction",
+    "description": "As a shopper searching for 'kids red shoes size 4', I want the system to extract color, size, category, and audience attributes from my query, so that results are filtered and ranked by those attributes rather than treating the query as a bag of words",
+    "acceptance_criteria": [
+      "Attribute extractor identifies color, size, brand, category, price range from free-text queries",
+      "Extracted attributes are applied as soft boosts and hard filters per attribute type",
+      "Extraction runs within query-understanding-service pipeline in <10ms",
+      "Extracted attributes are returned in SearchResponse for UI display as active filters",
+      "Extraction accuracy >80% on benchmark query set covering all supported locales"
+    ],
+    "priority": "P0",
+    "story_points": 8
+  },
+  {
+    "id": "US-08",
+    "epic_id": "EP-02",
+    "title": "Typo Tolerance and Phonetic Matching",
+    "description": "As a shopper who misspells product names, I want the search system to correct my query and return relevant results, so that typos do not result in zero results",
+    "acceptance_criteria": [
+      "Edit distance tolerance handles up to 2 character edits for queries >4 characters",
+      "Phonetic matching handles common sound-alike misspellings",
+      "Corrected query is shown to user as 'Showing results for X'",
+      "Zero-result rate for queries with single typo is <2%",
+      "Typo correction does not increase p95 latency beyond 200ms budget"
+    ],
+    "priority": "P0",
+    "story_points": 5
+  },
+  {
+    "id": "US-09",
+    "epic_id": "EP-02",
+    "title": "Locale-Aware Query Normalization",
+    "description": "As a shopper in a non-English locale, I want my query normalized using language-appropriate tokenization and stemming, so that search relevance is not degraded by English-tuned analyzers",
+    "acceptance_criteria": [
+      "Locale is detected from Accept-Language header and customer profile",
+      "Normalization applies locale-specific analyzer: en-US, en-GB, fr-FR, de-DE, ja-JP, es-MX",
+      "Locale is passed to both BM25 and vector retrieval stages",
+      "Analyzer configuration is externalized and updatable without redeployment",
+      "Relevance score for non-English locales improves by >20% vs English-only baseline in offline eval"
+    ],
+    "priority": "P1",
+    "story_points": 8
+  },
+  {
+    "id": "US-10",
+    "epic_id": "EP-03",
+    "title": "Real-Time Feature Retrieval for Ranking",
+    "description": "As a platform engineer, I want customer ranking features retrieved from Redis in real time during search, so that personalized ranking is informed by up-to-date session and history signals",
+    "acceptance_criteria": [
+      "RankingFeatures retrieved from Redis within 50ms p95",
+      "Features include customer segment, prior query categories, current cart items, loyalty tier, session events",
+      "Feature retrieval failure falls back to default popularity-based ranking without error surfaced to user",
+      "Feature freshness is <5 minutes for session events, <24 hours for historical features",
+      "Feature schema is versioned and backward compatible"
+    ],
+    "priority": "P0",
+    "story_points": 8
+  },
+  {
+    "id": "US-11",
+    "epic_id": "EP-03",
+    "title": "Personalized Ranking Model Serving",
+    "description": "As a shopper, I want search results ranked based on my purchase history and browsing behavior, so that the most relevant products for me appear at the top",
+    "acceptance_criteria": [
+      "ranking-model-service serves LambdaMART or two-tower model via gRPC",
+      "Model inference p95 <30ms for top-100 candidate reranking",
+      "Model is deployed via A/B experiment with 10% initial traffic allocation",
+      "Ranking model version is logged with each QueryLog record",
+      "Model rollback completes within 5 minutes via feature flag"
+    ],
+    "priority": "P0",
+    "story_points": 13
+  },
+  {
+    "id": "US-12",
+    "epic_id": "EP-03",
+    "title": "Cold-Start Handling for Anonymous Users",
+    "description": "As an anonymous shopper, I want to receive high-quality default search results based on popularity and trending signals, so that I am not penalized for not having a purchase history",
+    "acceptance_criteria": [
+      "Anonymous users identified by anonymous_id cookie",
+      "Cold-start ranking uses popularity score, trending boost, and editorial defaults",
+      "Cold-start path does not call ranking-model-service, reducing latency",
+      "Conversion rate for anonymous users tracked separately in analytics",
+      "Cold-start defaults are configurable by merchandisers without engineering"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-13",
+    "epic_id": "EP-03",
+    "title": "Personalization Experiment Framework Integration",
+    "description": "As an ML engineer, I want to run controlled experiments on personalization model variants, so that I can measure incremental conversion lift before full rollout",
+    "acceptance_criteria": [
+      "Experiment assignment uses Analytics team experimentation framework",
+      "Traffic splits configurable at 1%, 5%, 10%, 50%, 100%",
+      "Experiment metadata (variant_id, experiment_id) logged in QueryLog",
+      "Statistical significance dashboard updated daily",
+      "Experiment promotion requires p<0.05 on primary metric and no regression on guardrail metrics"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-14",
+    "epic_id": "EP-04",
+    "title": "Merchandising Rule Authoring UI",
+    "description": "As a merchandiser, I want to create boost, demote, and pin rules for products and categories without filing engineering tickets, so that I can respond to business needs in real time",
+    "acceptance_criteria": [
+      "Merchandising console is a React 18 SPA accessible to merchandiser role",
+      "Rules can be created for boost, demote, pin, and time-bound promotion types",
+      "Rule form validates match_pattern, target_skus, time_window, and priority fields",
+      "Rules are persisted to PostgreSQL via merchandising-console BFF",
+      "New rules are active in search within 60 seconds of save"
+    ],
+    "priority": "P0",
+    "story_points": 8
+  },
+  {
+    "id": "US-15",
+    "epic_id": "EP-04",
+    "title": "Pin Products to Top-N Positions",
+    "description": "As a merchandiser, I want to pin specific products to the top 1-5 positions for a given query, so that I can promote hero products during campaigns without engineering work",
+    "acceptance_criteria": [
+      "Pin rule specifies query pattern, product IDs, and position slots 1-5",
+      "Pinned products appear at specified positions regardless of ML ranking score",
+      "Pin rules respect time_window and are automatically deactivated after expiry",
+      "Conflict resolution: higher priority pin wins; ties resolved by created_at timestamp",
+      "Pinned positions are visually indicated in merchandiser query simulator"
+    ],
+    "priority": "P0",
+    "story_points": 5
+  },
+  {
+    "id": "US-16",
+    "epic_id": "EP-04",
+    "title": "Inventory-Aware Ranking",
+    "description": "As a shopper, I want out-of-stock products demoted in search results, so that I do not click on products I cannot buy",
+    "acceptance_criteria": [
+      "stock_flag field in SearchableProduct is updated within 60s of inventory event",
+      "OOS products are demoted by configurable score penalty (default -50% score)",
+      "OOS products are completely suppressed when suppress_oos flag is enabled per category",
+      "In-stock toggle facet filters to only in-stock results",
+      "Inventory demotion logic is bypassed for pinned products (merchandiser override)"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-17",
+    "epic_id": "EP-04",
+    "title": "Merchandiser Query Simulator",
+    "description": "As a merchandiser, I want to simulate search results for any query before publishing rule changes, so that I can verify the impact of my rules without affecting live shoppers",
+    "acceptance_criteria": [
+      "Query simulator is embedded in merchandising console",
+      "Simulator shows top-20 results with ranking scores and active rule annotations",
+      "Simulator supports preview mode showing results with pending unpublished rules",
+      "Explanation panel shows why each result was ranked (feature contributions)",
+      "Simulator response time <2 seconds for any query"
+    ],
+    "priority": "P1",
+    "story_points": 8
+  },
+  {
+    "id": "US-18",
+    "epic_id": "EP-05",
+    "title": "Voice Search via Speech-to-Text",
+    "description": "As a mobile shopper, I want to speak my search query instead of typing, so that I can search hands-free and more naturally",
+    "acceptance_criteria": [
+      "POST /api/v1/search/voice accepts audio/webm or audio/mp4 up to 30 seconds",
+      "AWS Transcribe is primary STT provider; Google Cloud Speech is fallback",
+      "Transcription p95 <800ms; total voice search p95 <1200ms",
+      "Transcribed text is passed to same query understanding and retrieval pipeline as text search",
+      "Transcription failure returns 503 with Retry-After header; UI falls back to text input",
+      "Transcribed query is displayed to user for confirmation before results shown"
+    ],
+    "priority": "P1",
+    "story_points": 8
+  },
+  {
+    "id": "US-19",
+    "epic_id": "EP-05",
+    "title": "Image Search via Visual Embeddings",
+    "description": "As a mobile shopper, I want to upload a photo to find visually similar products, so that I can find items I have seen in the real world without knowing their name",
+    "acceptance_criteria": [
+      "POST /api/v1/search/visual accepts image/jpeg or image/png up to 5MB",
+      "Vision embedding model generates query vector from uploaded image",
+      "Image vector is used for vector retrieval stage; BM25 stage is skipped for pure image queries",
+      "Image search p95 <1500ms including upload and embedding",
+      "Results include similarity_score per product",
+      "Image data is not stored after embedding generation; no PII risk"
+    ],
+    "priority": "P1",
+    "story_points": 13
+  },
+  {
+    "id": "US-20",
+    "epic_id": "EP-05",
+    "title": "Multi-Modal Graceful Degradation",
+    "description": "As a platform engineer, I want voice and image search to degrade gracefully when upstream vendors are unavailable, so that shoppers are not left with broken experiences",
+    "acceptance_criteria": [
+      "Voice search falls back from AWS Transcribe to Google Cloud Speech within 200ms timeout",
+      "Image search returns 503 with user-friendly message when vision service is unavailable",
+      "Fallback events are emitted to search.events.v1 for monitoring",
+      "Vendor availability is checked via health endpoint every 30 seconds",
+      "Degradation rate is tracked in daily operational dashboard with alert threshold >1%"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-21",
+    "epic_id": "EP-06",
+    "title": "Locale-Specific OpenSearch Analyzers",
+    "description": "As a shopper in France, Germany, Japan, or Mexico, I want search to use language-appropriate analyzers, so that stemming, tokenization, and stopword removal are correct for my language",
+    "acceptance_criteria": [
+      "Separate OpenSearch index per locale: en-US, en-GB, fr-FR, de-DE, ja-JP, es-MX",
+      "Each index uses locale-appropriate built-in or custom analyzer",
+      "Analyzer configuration is version-controlled in Terraform",
+      "Relevance benchmark suite covers 200 queries per locale",
+      "Average relevance score across all locales reaches 90% of en-US baseline"
+    ],
+    "priority": "P1",
+    "story_points": 8
+  },
+  {
+    "id": "US-22",
+    "epic_id": "EP-06",
+    "title": "Locale-Specific Embedding Models",
+    "description": "As a platform engineer, I want locale-specific or multilingual embedding models deployed for non-English locales, so that semantic retrieval quality is not degraded for international shoppers",
+    "acceptance_criteria": [
+      "Multilingual embedding model (e.g. multilingual-e5-large) deployed for fr-FR, de-DE, ja-JP, es-MX",
+      "Model selection is locale-aware in embedding-service",
+      "Offline NDCG@10 for each non-English locale within 10% of en-US score",
+      "Model inference latency p95 <25ms per query",
+      "Model version is tracked per locale in index metadata"
+    ],
+    "priority": "P1",
+    "story_points": 8
+  },
+  {
+    "id": "US-23",
+    "epic_id": "EP-06",
+    "title": "International Rollout with Locale Routing",
+    "description": "As a platform engineer, I want search requests routed to the correct locale index and analyzer automatically, so that international shoppers receive correctly localized results without manual configuration",
+    "acceptance_criteria": [
+      "Locale is resolved from: (1) explicit locale param, (2) customer profile, (3) Accept-Language header",
+      "Locale routing is applied at search-service before retrieval",
+      "Unknown locales fall back to en-US with locale_fallback flag in response",
+      "Locale routing logic is unit tested for all 6 supported locales",
+      "Locale is included in all QueryLog records for analytics segmentation"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-24",
+    "epic_id": "EP-07",
+    "title": "Type-Ahead Autocomplete",
+    "description": "As a shopper, I want query suggestions to appear as I type, so that I can find products faster and discover relevant search terms",
+    "acceptance_criteria": [
+      "GET /api/v1/autocomplete?q={prefix}&locale={locale} returns up to 10 suggestions",
+      "Autocomplete p95 <80ms",
+      "Suggestions sourced from popular query index updated hourly",
+      "Suggestions are locale-specific",
+      "Minimum prefix length is 2 characters"
+    ],
+    "priority": "P0",
+    "story_points": 5
+  },
+  {
+    "id": "US-25",
+    "epic_id": "EP-07",
+    "title": "Personalized Autocomplete Suggestions",
+    "description": "As a logged-in shopper, I want autocomplete to surface suggestions based on my search history and preferences, so that I can quickly return to relevant searches",
+    "acceptance_criteria": [
+      "Authenticated users receive personalized suggestions blended with popular queries",
+      "Personal suggestions are weighted higher than generic popular queries",
+      "Personal suggestion data is fetched from Redis feature store",
+      "Personalized suggestions are not shown to anonymous users",
+      "Personal query history is retained for 90 days per GDPR retention policy"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-26",
+    "epic_id": "EP-07",
+    "title": "Trending Search Highlights",
+    "description": "As a shopper, I want to see trending searches highlighted in autocomplete, so that I can discover popular products and categories",
+    "acceptance_criteria": [
+      "Trending queries are computed from last 24-hour query volume with >50% spike vs 7-day average",
+      "Trending badge is shown on up to 3 suggestions per autocomplete response",
+      "Trending computation runs as hourly batch job",
+      "Trending suggestions are locale-specific",
+      "Trending data is excluded from personalization to avoid filter bubble"
+    ],
+    "priority": "P2",
+    "story_points": 3
+  },
+  {
+    "id": "US-27",
+    "epic_id": "EP-08",
+    "title": "Streaming Catalog Event Ingestion",
+    "description": "As a platform engineer, I want product catalog changes to be reflected in the search index within 60 seconds, so that shoppers always see current product information and availability",
+    "acceptance_criteria": [
+      "catalog-publishing-service emits events to Kafka topic catalog.product.updated",
+      "search-indexing-service consumes events and updates OpenSearch and vector store",
+      "End-to-end latency from catalog event to searchable product <60s at p95",
+      "Failed events are retried with exponential backoff up to 3 attempts then dead-letter queue",
+      "Index update lag metric is published to CloudWatch with alert threshold >120s"
+    ],
+    "priority": "P0",
+    "story_points": 8
+  },
+  {
+    "id": "US-28",
+    "epic_id": "EP-08",
+    "title": "A/B Variant Index Management",
+    "description": "As an ML engineer, I want to maintain separate index variants for A/B experiments, so that new embedding models or schema changes can be tested safely without affecting production traffic",
+    "acceptance_criteria": [
+      "Index naming convention: search-{locale}-{variant} e.g. search-en-us-control",
+      "Traffic routing to variant index is controlled by experiment framework",
+      "Variant index can be promoted to production via ArgoCD pipeline",
+      "Full index rebuild for a variant completes in <4 hours for 500k SKUs",
+      "Variant index health is monitored independently from production index"
+    ],
+    "priority": "P1",
+    "story_points": 8
+  },
+  {
+    "id": "US-29",
+    "epic_id": "EP-08",
+    "title": "Search Result Explainability API",
+    "description": "As a merchandiser or ML engineer, I want to retrieve a per-result explanation of why a product was ranked at a given position, so that I can debug relevance issues and build trust in the ranking model",
+    "acceptance_criteria": [
+      "GET /api/v1/search/explanation/{query_id}/{result_id} returns feature contributions",
+      "Explanation includes BM25 score, vector similarity score, personalization score, merchandising rule applied, and final blended score",
+      "Explanation data is stored in S3 with 30-day retention",
+      "Explanation API is restricted to internal roles via bearer-jwt with merchandiser or ml-engineer claim",
+      "Response time <500ms for explanation retrieval"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-30",
+    "epic_id": "EP-08",
+    "title": "Index Health Monitoring and Alerting",
+    "description": "As a platform engineer, I want comprehensive index health monitoring, so that I can detect and respond to indexing failures before they impact search quality",
+    "acceptance_criteria": [
+      "Index health dashboard shows: document count, index lag, embedding coverage %, error rate",
+      "Alerts fire when index lag >120s, error rate >1%, or embedding coverage <99%",
+      "Index health metrics exposed via /actuator/health endpoint",
+      "Daily index health report emailed to search platform team",
+      "Full index rebuild can be triggered via ops runbook without code deployment"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-31",
+    "epic_id": "EP-09",
+    "title": "Dynamic Facets per Query",
+    "description": "As a shopper, I want to see relevant filter options that change based on my search query, so that I can narrow results using attributes that make sense for what I am searching for",
+    "acceptance_criteria": [
+      "Facets are computed from top-100 results for each query",
+      "Facet set changes based on query context: shoe queries show size/color/brand; electronics show brand/specs/price",
+      "Facet ordering is by usage frequency descending",
+      "Maximum 8 facets shown by default with expand option",
+      "Facet computation adds <20ms to search response time"
+    ],
+    "priority": "P1",
+    "story_points": 8
+  },
+  {
+    "id": "US-32",
+    "epic_id": "EP-09",
+    "title": "Multi-Select Facet Filtering",
+    "description": "As a shopper, I want to select multiple values within a facet and choose AND or OR semantics, so that I can build precise filters that match my needs",
+    "acceptance_criteria": [
+      "Facet values support multi-select with checkbox UI",
+      "Default semantics for same-facet multi-select is OR (e.g. Red OR Blue)",
+      "Cross-facet filtering uses AND semantics (e.g. Red AND Size 10)",
+      "Selected facets are reflected in URL as cursor-paginated filter params",
+      "Facet counts update dynamically as filters are applied"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  },
+  {
+    "id": "US-33",
+    "epic_id": "EP-09",
+    "title": "Result Diversity and Anti-Clustering",
+    "description": "As a shopper searching for an ambiguous query, I want results from diverse brands and categories, so that I am not shown five variations of the same product from one brand",
+    "acceptance_criteria": [
+      "Anti-clustering limits same brand to maximum 2 of top 5 results by default",
+      "Category mixing is applied for queries classified as browse intent",
+      "Diversity parameters are configurable per query intent type",
+      "Freshness boost applies +10% score to products added in last 30 days",
+      "Diversity logic is applied post-ranking before final result serialization"
+    ],
+    "priority": "P1",
+    "story_points": 5
+  }
+]
