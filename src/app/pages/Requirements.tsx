@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type { Epic, UserStory } from "../utils/requirementsTypes";
+import { useNavigate, useLocation } from "react-router";
 import {
   Upload,
   FileText,
@@ -27,32 +29,20 @@ interface BRDDocument {
   uploadedAt: string;
   summary: string;
   confidence: number;
-  projectType?: "brownfield" | "greenfield";
-  jiraProject?: string;
-  jiraTickets?: number;
 }
 
-interface Epic {
+interface Project {
   id: string;
-  title: string;
-  description: string;
-  status: "pending" | "approved" | "rejected";
-  userStories: UserStory[];
-  expanded?: boolean;
-}
-
-interface UserStory {
-  id: string;
-  title: string;
-  description: string;
-  priority: "low" | "medium" | "high" | "critical";
-  storyPoints: number;
-  acceptanceCriteria: string[];
-  status: "pending" | "approved" | "rejected";
-  expanded?: boolean;
+  name: string;
+  type: "greenfield" | "brownfield";
+  lastActive: string;
+  status: "active" | "planning" | "completed";
+  confidence: number;
 }
 
 export function Requirements() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState<Step>("upload");
   const [uploadedDocument, setUploadedDocument] = useState<BRDDocument | null>(
     null,
@@ -62,10 +52,18 @@ export function Requirements() {
     "pending" | "approved" | "partial"
   >("pending");
 
+  // Get project from navigation state if clicking existing project
+  const existingProject =
+    (location.state as { project?: Project })?.project || null;
+
   const steps = [
-    { id: "upload", label: "Upload BRD", icon: Upload },
+    { id: "upload", label: "Project Intake", icon: Upload },
     { id: "generation", label: "Epic Review", icon: Sparkles },
-    { id: "approval", label: "Story Review", icon: CheckCircle },
+    {
+      id: "approval",
+      label: "Story Review",
+      icon: CheckCircle,
+    },
     { id: "jira", label: "Jira Sync", icon: GitBranch },
   ];
 
@@ -84,6 +82,11 @@ export function Requirements() {
     setCurrentStep("jira");
   };
 
+  const handleJiraComplete = () => {
+    // Navigate back to Projects page
+    navigate("/projects");
+  };
+
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
       {/* Header */}
@@ -91,10 +94,14 @@ export function Requirements() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Requirements Management
+              {existingProject
+                ? `Enhance ${existingProject.name}`
+                : "Requirements Management"}
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Transform BRDs into actionable user stories with AI
+              {existingProject
+                ? "Upload documents and provide instructions to enhance this project"
+                : "Transform BRDs into actionable user stories with AI"}
             </p>
           </div>
         </div>
@@ -157,7 +164,10 @@ export function Requirements() {
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-8">
         {currentStep === "upload" && (
-          <BRDUpload onUploadComplete={handleDocumentUpload} />
+          <BRDUpload
+            onUploadComplete={handleDocumentUpload}
+            existingProject={existingProject}
+          />
         )}
         {currentStep === "generation" && uploadedDocument && (
           <AIGeneration
@@ -171,11 +181,10 @@ export function Requirements() {
             onComplete={handleApprovalComplete}
           />
         )}
-        {currentStep === "jira" && uploadedDocument && (
+        {currentStep === "jira" && (
           <JiraIntegration
             epics={generatedEpics}
-            projectType={uploadedDocument.projectType}
-            jiraProject={uploadedDocument.jiraProject}
+            onComplete={handleJiraComplete}
           />
         )}
       </div>

@@ -872,7 +872,7 @@ export function ProjectSetupChat({
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          Upload BRD/PRD Document
+                          Upload Document
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           PDF, DOCX, TXT (Max 10MB)

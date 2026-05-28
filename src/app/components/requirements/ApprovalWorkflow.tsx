@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Epic, UserStory } from "../../utils/requirementsTypes";
 import {
   CheckCircle,
   XCircle,
@@ -10,29 +11,6 @@ import {
   Clock,
 } from "lucide-react";
 
-interface UserStory {
-  id: string;
-  epic_id: string;
-  title: string;
-  description: string;
-  priority: string;
-  story_points: number;
-  acceptance_criteria: string[];
-  status?: "pending" | "approved" | "rejected";
-  expanded?: boolean;
-  feedback?: string;
-}
-
-interface Epic {
-  id: string;
-  title: string;
-  description: string;
-  status: "pending" | "approved" | "rejected";
-  userStories: UserStory[];
-  expanded?: boolean;
-  feedback?: string;
-}
-
 interface ApprovalWorkflowProps {
   epics: Epic[];
   onComplete: (status: "approved" | "partial") => void;
@@ -42,7 +20,7 @@ export function ApprovalWorkflow({
   epics: initialEpics,
   onComplete,
 }: ApprovalWorkflowProps) {
-  const [epics, setEpics] = useState(initialEpics);
+  const [epics, setEpics] = useState<Epic[]>(initialEpics);
   const [feedbackMode, setFeedbackMode] = useState<{
     type: "reject" | "regenerate";
     id: string;
@@ -387,23 +365,25 @@ export function ApprovalWorkflow({
                               Acceptance Criteria
                             </h5>
                             <div className="space-y-2">
-                              {story.acceptance_criteria.map(
-                                (criteria, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex items-start gap-3"
-                                  >
-                                    <div className="w-5 h-5 rounded border-2 border-gray-300 dark:border-white/20 flex items-center justify-center mt-0.5 flex-shrink-0">
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {index + 1}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                                      {criteria}
-                                    </p>
+                              {(
+                                story.acceptanceCriteria ??
+                                story.acceptance_criteria ??
+                                []
+                              ).map((criteria, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-start gap-3"
+                                >
+                                  <div className="w-5 h-5 rounded border-2 border-gray-300 dark:border-white/20 flex items-center justify-center mt-0.5 flex-shrink-0">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {index + 1}
+                                    </span>
                                   </div>
-                                ),
-                              )}
+                                  <p className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                                    {criteria}
+                                  </p>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </div>

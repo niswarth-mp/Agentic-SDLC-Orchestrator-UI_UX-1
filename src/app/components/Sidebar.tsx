@@ -13,7 +13,6 @@ import {
   Search,
   Zap,
   Sparkles,
-  FileCheck,
 } from "lucide-react";
 
 interface NavItem {
@@ -34,7 +33,6 @@ const navSections: NavSection[] = [
     items: [
       { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { path: "/ai-workspace", label: "AI Workspace", icon: Sparkles },
-      { path: "/requirements", label: "Requirements", icon: FileCheck },
       { path: "/projects", label: "Projects", icon: FolderKanban },
       { path: "/pipelines", label: "Pipelines", icon: GitBranch },
     ],

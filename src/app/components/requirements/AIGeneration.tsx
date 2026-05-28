@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { Epic, UserStory } from "../../utils/requirementsTypes";
 import {
   ChevronDown,
   ChevronRight,
@@ -16,27 +17,6 @@ interface BRDDocument {
   uploadedAt: string;
   summary: string;
   confidence: number;
-}
-
-interface UserStory {
-  id: string;
-  epic_id: string;
-  title: string;
-  description: string;
-  priority: string;
-  story_points: number;
-  acceptance_criteria: string[];
-  status?: "pending" | "approved" | "rejected";
-  expanded?: boolean;
-}
-
-interface Epic {
-  id: string;
-  title: string;
-  description: string;
-  status: "pending" | "approved" | "rejected";
-  userStories: UserStory[];
-  expanded?: boolean;
 }
 
 interface AIGenerationProps {
@@ -120,14 +100,32 @@ const EPIC_METADATA: Record<string, { title: string; description: string }> = {
 };
 
 // Group user stories by epic_id
-function groupStoriesByEpic(stories: UserStory[]): Epic[] {
+function normalizeStory(s: any): UserStory {
+  return {
+    id: s.id,
+    epicId: s.epic_id ?? s.epicId,
+    title: s.title,
+    description: s.description,
+    priority: s.priority ?? "P3",
+    storyPoints: s.story_points ?? s.storyPoints ?? 3,
+    story_points: s.story_points ?? s.storyPoints,
+    acceptanceCriteria: s.acceptance_criteria ?? s.acceptanceCriteria ?? [],
+    acceptance_criteria: s.acceptance_criteria ?? s.acceptanceCriteria ?? [],
+    status: s.status ?? "pending",
+    expanded: s.expanded,
+  };
+}
+
+function groupStoriesByEpic(stories: any[]): Epic[] {
   const epicMap = new Map<string, UserStory[]>();
 
-  stories.forEach((story) => {
-    if (!epicMap.has(story.epic_id)) {
-      epicMap.set(story.epic_id, []);
+  stories.forEach((raw) => {
+    const story = normalizeStory(raw);
+    const epicId = story.epicId ?? "EP-01";
+    if (!epicMap.has(epicId)) {
+      epicMap.set(epicId, []);
     }
-    epicMap.get(story.epic_id)!.push({ ...story, status: "pending" });
+    epicMap.get(epicId)!.push({ ...story, status: story.status ?? "pending" });
   });
 
   return Array.from(epicMap.entries()).map(([epicId, userStories]) => ({
@@ -140,7 +138,7 @@ function groupStoriesByEpic(stories: UserStory[]): Epic[] {
   }));
 }
 
-const MOCK_EPICS: Epic[] = groupStoriesByEpic(userStoriesData as UserStory[]);
+const MOCK_EPICS: Epic[] = groupStoriesByEpic((userStoriesData as any[]) || []);
 
 export function AIGeneration({ document, onComplete }: AIGenerationProps) {
   const [isGenerating, setIsGenerating] = useState(true);
@@ -435,7 +433,7 @@ export function AIGeneration({ document, onComplete }: AIGenerationProps) {
                             {story.priority}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {story.story_points} SP
+                            {story.storyPoints ?? story.story_points} SP
                           </span>
                         </div>
                       </div>

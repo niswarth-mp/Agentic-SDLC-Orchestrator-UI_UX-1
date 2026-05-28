@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Epic, UserStory } from "../../utils/requirementsTypes";
 import {
   Upload,
   FileText,
@@ -29,26 +30,6 @@ interface BRDDocument {
   confidence: number;
 }
 
-interface Epic {
-  id: string;
-  title: string;
-  description: string;
-  status: "pending" | "approved" | "rejected";
-  userStories: UserStory[];
-  expanded?: boolean;
-}
-
-interface UserStory {
-  id: string;
-  title: string;
-  description: string;
-  priority: "low" | "medium" | "high" | "critical";
-  storyPoints: number;
-  acceptanceCriteria: string[];
-  status: "pending" | "approved" | "rejected";
-  expanded?: boolean;
-}
-
 export function Requirements() {
   const [currentStep, setCurrentStep] = useState<Step>("upload");
   const [uploadedDocument, setUploadedDocument] = useState<BRDDocument | null>(
@@ -60,7 +41,7 @@ export function Requirements() {
   >("pending");
 
   const steps = [
-    { id: "upload", label: "Upload BRD", icon: Upload },
+    { id: "upload", label: "Project Intake", icon: Upload },
     { id: "generation", label: "AI Generation", icon: Sparkles },
     { id: "approval", label: "Approval", icon: CheckCircle },
     { id: "jira", label: "Jira Sync", icon: GitBranch },

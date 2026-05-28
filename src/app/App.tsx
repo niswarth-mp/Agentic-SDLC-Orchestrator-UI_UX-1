@@ -4,7 +4,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { MainLayout } from "./components/MainLayout";
 import { Dashboard } from "./pages/Dashboard";
 import { AIWorkspace } from "./pages/AIWorkspace";
-import Projects from "./pages/Projects";
+import { Projects } from "./pages/Projects";
 import { ProjectDetails } from "./pages/ProjectDetails";
 import { Requirements } from "./pages/Requirements";
 import { Pipelines } from "./pages/Pipelines";

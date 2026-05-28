@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import type { Epic, UserStory } from "../../utils/requirementsTypes";
 import {
   ExternalLink,
   CheckCircle,
@@ -8,47 +9,17 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-interface UserStory {
-  id: string;
-  title: string;
-  description: string;
-  priority: "low" | "medium" | "high" | "critical";
-  storyPoints: number;
-  acceptanceCriteria: string[];
-  status: "pending" | "approved" | "rejected";
-  jiraKey?: string;
-  syncStatus?: "pending" | "syncing" | "synced" | "error";
-}
-
-interface Epic {
-  id: string;
-  title: string;
-  description: string;
-  status: "pending" | "approved" | "rejected";
-  userStories: UserStory[];
-  jiraKey?: string;
-  syncStatus?: "pending" | "syncing" | "synced" | "error";
-  expanded?: boolean;
-}
-
-interface EpicState extends Epic {
-  syncStatus: "pending" | "syncing" | "synced" | "error";
-  userStories: (UserStory & { syncStatus: "pending" | "syncing" | "synced" | "error" })[];
-}
-
 interface JiraIntegrationProps {
   epics: Epic[];
-  projectType?: "brownfield" | "greenfield";
-  jiraProject?: string;
+  onComplete?: () => void;
 }
 
 export function JiraIntegration({
   epics: initialEpics,
-  projectType,
-  jiraProject,
+  onComplete,
 }: JiraIntegrationProps) {
-  const [selectedProject, setSelectedProject] = useState(jiraProject || "ECOM");
-  const [epics, setEpics] = useState<EpicState[]>(
+  const [selectedProject, setSelectedProject] = useState("ECOM");
+  const [epics, setEpics] = useState<Epic[]>(
     initialEpics
       .filter((e) => e.status === "approved")
       .map((e) => ({
@@ -60,12 +31,12 @@ export function JiraIntegration({
             ...s,
             syncStatus: "pending" as const,
           })),
-      })) as EpicState[],
+      })),
   );
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentStep, setCurrentStep] = useState<
     "config" | "syncing" | "complete"
-  >(projectType === "brownfield" ? "syncing" : "config");
+  >("config");
 
   const jiraProjects = [
     {
@@ -89,14 +60,16 @@ export function JiraIntegration({
     setIsSyncing(true);
     setCurrentStep("syncing");
 
+    // Begin sync flow
+
     // Simulate epic sync
     for (let i = 0; i < epics.length; i++) {
-      const currentEpic = epics[i];
+      const epic = epics[i];
 
       // Sync epic
       setEpics((prev) =>
         prev.map((e) =>
-          e.id === currentEpic.id ? { ...e, syncStatus: "syncing" as const } : e,
+          e.id === epic.id ? { ...e, syncStatus: "syncing" as const } : e,
         ),
       );
 
@@ -104,7 +77,7 @@ export function JiraIntegration({
 
       setEpics((prev) =>
         prev.map((e) =>
-          e.id === currentEpic.id
+          e.id === epic.id
             ? {
                 ...e,
                 syncStatus: "synced" as const,
@@ -115,12 +88,12 @@ export function JiraIntegration({
       );
 
       // Sync user stories
-      for (let j = 0; j < currentEpic.userStories.length; j++) {
-        const story = currentEpic.userStories[j];
+      for (let j = 0; j < epic.userStories.length; j++) {
+        const story = epic.userStories[j];
 
         setEpics((prev) =>
           prev.map((e) =>
-            e.id === currentEpic.id
+            e.id === epic.id
               ? {
                   ...e,
                   userStories: e.userStories.map((s) =>
@@ -137,7 +110,7 @@ export function JiraIntegration({
 
         setEpics((prev) =>
           prev.map((e) =>
-            e.id === currentEpic.id
+            e.id === epic.id
               ? {
                   ...e,
                   userStories: e.userStories.map((s) =>
@@ -161,8 +134,8 @@ export function JiraIntegration({
   };
 
   const toggleEpic = (epicId: string) => {
-    setEpics(
-      epics.map((epic) =>
+    setEpics((prev) =>
+      prev.map((epic) =>
         epic.id === epicId ? { ...epic, expanded: !epic.expanded } : epic,
       ),
     );
@@ -175,18 +148,6 @@ export function JiraIntegration({
     0,
   );
   const totalStories = epics.reduce((acc, e) => acc + e.userStories.length, 0);
-
-  // Auto-start sync for brownfield projects
-  useEffect(() => {
-    if (
-      projectType === "brownfield" &&
-      !isSyncing &&
-      currentStep === "syncing" &&
-      epics.length > 0
-    ) {
-      handleSync();
-    }
-  }, [projectType, isSyncing, currentStep, epics.length]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -407,10 +368,10 @@ export function JiraIntegration({
 
           <div className="flex items-center justify-end">
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => onComplete?.()}
               className="px-6 py-3 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-xl font-medium hover:from-[#5558E3] hover:to-[#7C4FE0] transition-all"
             >
-              Create Another BRD
+              Back to Projects
             </button>
           </div>
         </>

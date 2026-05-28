@@ -1,315 +1,319 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { useState, useRef, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { Plus, Folder, Calendar, ChevronRight, ArrowLeft } from "lucide-react";
+import { ProjectSetupChat } from "../components/workspace/ProjectSetupChat";
+import { TaskTracker, Task } from "../components/workspace/TaskTracker";
+import { Badge } from "../components/ui/badge";
 
 interface Project {
   id: string;
-  name: string; // config.app_name
-  phase: string;
-  env?: string; // config.env
-  pipeline?: string; // pipeline_name
-  version?: number;
-  created?: string;
-  description?: string;
-  projectType?: string; // project_type/raw (kept but not used in UI)
+  name: string;
+  category: string;
+  type: "greenfield" | "brownfield";
+  lastActive: string;
+  status: "active" | "planning" | "completed";
+  assets: number;
+  version: string;
+  description: string;
 }
 
-const PHASE_CONFIG: Record<string, { label: string; badgeClass: string }> = {
-  idea: { label: "Idea", badgeClass: "bg-gray-100 text-gray-800" },
-  discovery: {
-    label: "Discovery",
-    badgeClass: "bg-indigo-100 text-indigo-800",
+const INITIAL_PROJECTS: Project[] = [
+  {
+    id: "ai-delivery-copilot",
+    name: "AI Delivery Co-Pilot",
+    category: "REQUIREMENTS",
+    type: "greenfield",
+    lastActive: "5/26/2026",
+    status: "active",
+    assets: 4,
+    version: "v1.0.0",
+    description:
+      "Multi-modal contextual parsing layer built to optimize delivery tracking, parse engineering artifacts, and cross-team workflows.",
   },
-  design: { label: "Design", badgeClass: "bg-pink-100 text-pink-800" },
-  implementation: {
-    label: "Implementation",
-    badgeClass: "bg-green-100 text-green-800",
+  {
+    id: "workplace-multi-vendor",
+    name: "Workplace Multi-Vendor Platform",
+    category: "DEVELOPMENT",
+    type: "brownfield",
+    lastActive: "4/12/2026",
+    status: "active",
+    assets: 3,
+    version: "v2.4.1",
+    description:
+      "Refactoring application core architecture with robust microservices topology and repository design patterns for scale.",
   },
-  deployment: { label: "Deployment", badgeClass: "bg-blue-100 text-blue-800" },
-  failed: { label: "Failed", badgeClass: "bg-red-100 text-red-800" },
-  approval_design: {
-    label: "Approval (Design)",
-    badgeClass: "bg-yellow-100 text-yellow-800",
+  {
+    id: "enterprise-knowledge-router",
+    name: "Enterprise Knowledge Base Router",
+    category: "DESIGN",
+    type: "greenfield",
+    lastActive: "5/10/2026",
+    status: "planning",
+    assets: 1,
+    version: "v0.2.0",
+    description:
+      "Vector index router optimization engine utilizing smart routing workflows over distributed private cloud execution.",
   },
-  // New phases requested — distinct, accessible colors
-  req_design: {
-    label: "Req Design",
-    badgeClass: "bg-purple-100 text-purple-800",
-  },
-  development: {
-    label: "Development",
-    badgeClass: "bg-green-50 text-green-900",
-  },
-  security_scan: {
-    label: "Security Scan",
-    badgeClass: "bg-red-100 text-red-800",
-  },
-  testing: { label: "Testing", badgeClass: "bg-yellow-50 text-yellow-900" },
-  infra_provision: {
-    label: "Infra Provision",
-    badgeClass: "bg-teal-100 text-teal-800",
-  },
-  gitops_deploy: {
-    label: "GitOps Deploy",
-    badgeClass: "bg-blue-50 text-blue-900",
-  },
+];
+
+const STATUS_CONFIG = {
+  active: { color: "bg-[#22C55E]", label: "Active" },
+  planning: { color: "bg-[#F59E0B]", label: "Planning" },
+  completed: { color: "bg-gray-500", label: "Completed" },
 };
 
-function getPhaseConfig(phase?: string) {
-  if (!phase)
-    return {
-      label: phase ?? "Unknown",
-      badgeClass: "bg-gray-100 text-gray-800",
-    };
-  return (
-    PHASE_CONFIG[phase] ?? {
-      label: phase,
-      badgeClass: "bg-gray-100 text-gray-800",
-    }
-  );
-}
-
-async function fetchProjects(limit = 50): Promise<Project[]> {
-  const res = await fetch(`http://localhost:8002/api/projects?limit=${limit}`);
-  if (!res.ok) throw new Error("Failed to fetch projects");
-  const data = await res.json();
-  // Normalize to Project shape using canonical response hints
-  return (data.projects ?? data ?? [])
-    .map((p: any) => ({
-      id: String(p.project_id ?? p.id ?? ""),
-      name: String(
-        p.config?.app_name ?? p.config?.name ?? p.name ?? "Untitled Project",
-      ),
-      phase: String(p.phase ?? ""),
-      env: p.config?.env ?? p.env,
-      pipeline: p.pipeline_name ?? p.pipeline,
-      version: p.version,
-      created: p.created,
-      description:
-        p.description ?? p.config?.description ?? p.config?.constraints ?? "",
-      projectType: String(p.project_type ?? p.type ?? ""),
-    }))
-    .filter((pr: Project) => !!pr.id);
-}
-
-interface ProjectsProps {
-  initialProjects?: Project[];
-}
-
-export default function Projects({
-  initialProjects,
-}: ProjectsProps): React.ReactElement {
-  const [projects, setProjects] = useState<Project[]>(initialProjects ?? []);
-  const [isFetching, setIsFetching] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const [newProjectId, setNewProjectId] = useState<string | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+export function Projects({ initialProjects }: { initialProjects?: Project[] }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [currentTasks, setCurrentTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>(
+    initialProjects && initialProjects.length
+      ? initialProjects
+      : INITIAL_PROJECTS,
+  );
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [newProjectId, setNewProjectId] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Handle new project from AI Workspace
   useEffect(() => {
-    let mounted = true;
-    setIsFetching(true);
-    fetchProjects(50)
-      .then((list) => {
-        if (!mounted) return;
-        setProjects(list);
-        setFetchError(null);
-      })
-      .catch((err) => {
-        if (!mounted) return;
-        setFetchError(String(err.message || err));
-      })
-      .finally(() => mounted && setIsFetching(false));
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    const state = location.state as {
+      newProject?: Project;
+    } | null;
+    if (state?.newProject) {
+      const newProject = state.newProject;
+      // Check if project already exists to avoid duplicates
+      if (!projects.find((p) => p.id === newProject.id)) {
+        setProjects([newProject, ...projects]);
+        setNewProjectId(newProject.id);
+        setShowSuccessMessage(true);
 
-  // If another route created a project and passed it through location.state, prepend it
-  useEffect(() => {
-    const state = (location as any).state;
-    if (state && state.newProject) {
-      const np = state.newProject as Project;
-      setProjects((prev) => [np, ...prev]);
-      setNewProjectId(np.id ?? null);
-      // clear history state to avoid duplicates
-      try {
-        window.history.replaceState({}, document.title);
-      } catch {}
+        // Scroll to top to show the new project
+        setTimeout(() => {
+          scrollContainerRef.current?.scrollTo({
+            top: 0,
+            behavior: "smooth",
+          });
+        }, 100);
+
+        setTimeout(() => {
+          setShowSuccessMessage(false);
+        }, 3000);
+        setTimeout(() => {
+          setNewProjectId(null);
+        }, 5000);
+      }
+      // Clear the state
+      window.history.replaceState({}, document.title);
     }
-  }, [location]);
+  }, [location.state]);
 
   const handleProjectComplete = (newProject: Project) => {
-    setProjects((prev) => [newProject, ...prev]);
+    setProjects([newProject, ...projects]);
     setNewProjectId(newProject.id);
+    setShowSuccessMessage(true);
     setIsCreatingProject(false);
-    setTimeout(
-      () =>
-        scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" }),
-      120,
-    );
+    setCurrentTasks([]);
+
+    // Scroll to top to show the new project
+    setTimeout(() => {
+      scrollContainerRef.current?.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }, 100);
+
+    setTimeout(() => {
+      setShowSuccessMessage(false);
+    }, 3000);
+    setTimeout(() => {
+      setNewProjectId(null);
+    }, 5000);
   };
 
-  return (
-    <div className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
-      <div className="h-16 border-b border-gray-200 dark:border-white/10 px-6 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Projects
-          </h2>
-          <p className="text-sm text-gray-500">{projects.length} projects</p>
-        </div>
-        <div>
+  // Show chat interface when creating project
+  if (isCreatingProject) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-[#0A0F1E] transition-colors">
+        {/* Back Button Header */}
+        <div className="h-16 border-b border-gray-200 dark:border-white/10 px-6 flex items-center flex-shrink-0">
           <button
-            onClick={() => setIsCreatingProject(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-lg"
+            onClick={() => setIsCreatingProject(false)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all text-sm font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Projects
+          </button>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          {/* Chat Interface */}
+          <div className="flex-1 min-w-0">
+            <ProjectSetupChat
+              onClose={() => {
+                setIsCreatingProject(false);
+                setCurrentTasks([]);
+              }}
+              onTaskUpdate={setCurrentTasks}
+              onProjectComplete={handleProjectComplete}
+            />
+          </div>
+
+          {/* Task Tracker */}
+          <TaskTracker projectId={null} tasks={currentTasks} />
+        </div>
+      </div>
+    );
+  }
+
+  // Show projects list
+  return (
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 transition-colors">
+      <div className="px-8 py-6 border-b border-slate-200 bg-white/80 backdrop-blur-md">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold">Projects</h1>
+            <p className="mt-2 text-sm text-slate-600 max-w-2xl">
+              A unified view of your initiatives, asset connectivity, and
+              delivery status.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/requirements")}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#6366F1]/20 transition-all hover:from-[#5558E3] hover:to-[#7C4FE0]"
           >
             <Plus className="w-4 h-4" />
-            Create Project
+            New Project
           </button>
         </div>
       </div>
 
-      {isCreatingProject ? (
-        <div className="p-6">
-          <button
-            onClick={() => setIsCreatingProject(false)}
-            className="text-sm text-gray-500 mb-4 inline-flex items-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Projects
-          </button>
-          <div className="p-6 bg-white dark:bg-[#111827] rounded-lg">
-            Project creation UI goes here.
-          </div>
-        </div>
-      ) : (
-        <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-8 py-6"
-        >
-          <div className="max-w-5xl mx-auto space-y-4">
-            {isFetching && (
-              <div className="text-center text-sm text-gray-500">
-                Loading projects…
-              </div>
-            )}
-            {fetchError && (
-              <div className="text-center text-sm text-red-500">
-                {fetchError}
-              </div>
-            )}
-
-            {projects.map((project) => (
-              <Link
-                key={project.id}
-                to={`/projects/${project.id}`}
-                className="block group"
+      {showSuccessMessage && (
+        <div className="mx-8 mt-6 rounded-3xl border border-emerald-200/70 bg-emerald-50/80 p-4 text-slate-800 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <div
-                  className={`bg-white dark:bg-[#111827] border rounded-[28px] p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6366F1]/40 hover:shadow-lg ${project.id === newProjectId ? "border-[#22C55E]/50 shadow-[#22C55E]/10" : "border-gray-200 dark:border-white/10"}`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-white shadow-inner">
-                      <Folder className="w-6 h-6" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                        <div className="min-w-0">
-                          <h3 className="text-5xl font-extrabold text-gray-900 dark:text-white truncate">
-                            {project.name}
-                          </h3>
-                          {project.description ? (
-                            <p className="text-1xl font-extrabold leading-6 text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">
-                              {project.description}
-                            </p>
-                          ) : (
-                            <p className="text-sm leading-6 text-gray-500 dark:text-gray-400 mt-2">
-                              No description available.
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${getPhaseConfig(project.phase).badgeClass}`}
-                          >
-                            {getPhaseConfig(project.phase).label}
-                          </span>
-                          {project.env ? (
-                            <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-gray-700 bg-gray-100 dark:text-gray-200 dark:bg-white/10 border border-gray-200 dark:border-white/10">
-                              {project.env}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="mt-5 grid gap-3 sm:grid-cols-3 text-sm text-gray-600 dark:text-gray-300">
-                        {project.pipeline ? (
-                          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3">
-                            <div className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                              Pipeline
-                            </div>
-                            <div className="mt-1 font-medium text-gray-900 dark:text-white truncate">
-                              {project.pipeline}
-                            </div>
-                          </div>
-                        ) : null}
-                        {project.version ? (
-                          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3">
-                            <div className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                              Version
-                            </div>
-                            <div className="mt-1 font-medium text-gray-900 dark:text-white">
-                              v{project.version}
-                            </div>
-                          </div>
-                        ) : null}
-                        {project.created ? (
-                          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3">
-                            <div className="text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                              Created
-                            </div>
-                            <div className="mt-1 font-medium text-gray-900 dark:text-white">
-                              {new Date(project.created).toLocaleString()}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex justify-end">
-                    <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 transition-colors group-hover:text-[#6366F1]" />
-                  </div>
-                </div>
-              </Link>
-            ))}
-
-            {projects.length === 0 && !isFetching && (
-              <div className="text-center py-16">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] rounded-3xl flex items-center justify-center mx-auto mb-6 opacity-50">
-                  <Folder className="w-10 h-10 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  No projects yet
-                </h3>
-                <p className="text-gray-400 mb-6">
-                  Create your first project to get started
-                </p>
-                <button
-                  onClick={() => setIsCreatingProject(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] text-white rounded-xl font-medium"
-                >
-                  <Plus className="w-5 h-5" />
-                  Create Project
-                </button>
-              </div>
-            )}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">
+                Project created successfully!
+              </p>
+              <p className="text-xs text-slate-500">
+                Your new project has been added to the list.
+              </p>
+            </div>
           </div>
         </div>
       )}
+
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-8 py-6"
+      >
+        <div className="mx-auto flex max-w-7xl flex-col gap-6">
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_80px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] text-white shadow-lg shadow-[#6366F1]/20">
+                  <Folder className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+                    Centralized Enterprise Projects Router
+                  </p>
+                  <h2 className="mt-3 text-3xl font-semibold text-slate-900">
+                    Your project portfolio at a glance
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                    Browse active initiatives with connected assets, release
+                    readiness, and high-level progress indicators.
+                  </p>
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-3 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#6366F1]" />
+                3 Total
+              </div>
+            </div>
+          </section>
+
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {projects.map((project) => (
+              <button
+                key={project.id}
+                onClick={() =>
+                  navigate("/requirements", { state: { project } })
+                }
+                className="group w-full text-left"
+              >
+                <div
+                  className={`flex h-full flex-col justify-between rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-[#6366F1]/30 hover:shadow-lg ${
+                    project.id === newProjectId
+                      ? "border-emerald-300 shadow-[0_30px_60px_-30px_rgba(34,197,94,0.6)]"
+                      : ""
+                  }`}
+                >
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-[#EEF2FF] text-[#4F46E5]">
+                          <Folder className="h-5 w-5" />
+                        </div>
+                        <Badge variant="secondary">{project.category}</Badge>
+                      </div>
+                      <Badge variant="outline">{project.type}</Badge>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xl font-semibold text-slate-900 group-hover:text-[#4F46E5]">
+                        {project.name}
+                      </h3>
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        {project.description}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${STATUS_CONFIG[project.status].color}`}
+                        />
+                        {STATUS_CONFIG[project.status].label}
+                      </div>
+                      <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                        {project.assets} Assets Connected
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex items-center justify-between text-sm text-slate-500">
+                    <span className="inline-flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      {project.lastActive}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      {project.version}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
